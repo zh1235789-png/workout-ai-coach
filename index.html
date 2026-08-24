@@ -42,6 +42,9 @@ input[type=text],input[type=password],textarea{width:100%;padding:11px;border-ra
 textarea{resize:vertical;min-height:80px}
 label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weight:600}
 .field{margin-bottom:14px}
+.seg{display:flex;background:var(--bg);border-radius:10px;padding:3px;gap:3px}
+.seg button{flex:1;padding:9px 0;border:none;border-radius:8px;background:transparent;color:var(--sub);font-size:13px;font-weight:600}
+.seg button.sel{background:var(--card);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .preview-img{width:100%;border-radius:12px;margin-bottom:12px;border:1px solid var(--border)}
 .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:20px auto}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -89,14 +92,29 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 const LS_KEY_SESSIONS = 'wac_sessions';
 const LS_KEY_APIKEY = 'wac_apikey';
 const LS_KEY_CONDITION = 'wac_condition';
+const LS_KEY_GYM_EQUIP_1 = 'wac_gym_equip_1';
+const LS_KEY_GYM_EQUIP_2 = 'wac_gym_equip_2';
+const LS_KEY_LAST_GYM = 'wac_last_gym';
 const DEFAULT_CONDITION = '左ハムストリング肉離れ(2026-07-04受傷)からリハビリ中。脚トレは控えめ・痛みが出ない範囲で漸進的に。目的は健康維持・筋力向上・体脂肪率の低下。筋トレ週3-4回、有酸素運動(ランニング・ウォーキング)週3-4回。';
 
-let state = { tab: 'home', pendingImage: null, pendingResult: null, loading: false, error: null };
+const GYM_NAMES = { '1': 'エニタイムフィットネス志村坂上店', '2': 'エニタイムフィットネス文京本郷店（本郷三丁目）' };
+const DEFAULT_EQUIP_1 = `【マシンエリア】レッグエクステンション、レッグカール、レッグプレス、インナーサイ/アウターサイ、ショルダープレス、チェストプレス、シーテッドロウ、プルダウン(2台)、ロータリートルソー、アブドミナル、インクラインプレス、アングルドレッグプレス、ペクトラル・フライ/リア・デルトイド、グルード・ブリッジ
+【フリーウェイトエリア】DPLシーテッドロウ、DPLショルダープレス、デッドリフトエリート、パワーラック(2台)、スミスマシン、ケーブルマシン、プリチャーカール、シーテッドアームカール、アジャスタブルベンチ(3台)、フラットベンチ、ダンベル(1〜50kg)、ディップ/チンアシスト、アイソラテラル系マシン各種、Tバーロウ、ラテラルレイズ、ハックスクワット
+【有酸素】ステアクライマー、トレッドミル(8台)、リカンベントバイク(2台)、アップライトバイク(2台)、クロストレーナー(2台)
+【ファンクショナル】ケーブルマシン、バランスボール、ゴムチューブ、ストレッチポール`;
+const DEFAULT_EQUIP_2 = `【筋トレマシン(PRECOR製)】ペクトラルフライ、ショルダープレス、ディップ/チン、バイセップカール/トライセップエクステンション、アブドミナル、ロータリートルソー、チェストプレス、シーテッドロー、ラットプルダウン、バックエクステンション、レッグプレス、レッグカール、レッグエクステンション、インナー/アウターサイ、腹筋台、背筋台
+【フリーウェイト】ケーブルマシン(1台)、パワーラック(3台)、スミスマシン(1台) ※ダンベル等の詳細は未確認、実際と異なる場合はここを編集してください
+【有酸素(PRECOR製)】トレッドミル(8台)、クロストレーナー(2台)、リカンベントバイク(2台)、アップライトバイク(2台)
+【その他】ストレッチエリア、体組成計`;
+
+let state = { tab: 'home', pendingImage: null, pendingResult: null, loading: false, error: null, selectedGym: null };
 
 function getSessions(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_SESSIONS)||'[]'); }catch(e){ return []; } }
 function saveSessions(list){ localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list)); }
 function getApiKey(){ return localStorage.getItem(LS_KEY_APIKEY) || ''; }
 function getCondition(){ return localStorage.getItem(LS_KEY_CONDITION) || DEFAULT_CONDITION; }
+function getGymEquip(id){ return localStorage.getItem(id==='1'?LS_KEY_GYM_EQUIP_1:LS_KEY_GYM_EQUIP_2) || (id==='1'?DEFAULT_EQUIP_1:DEFAULT_EQUIP_2); }
+function getLastGym(){ return localStorage.getItem(LS_KEY_LAST_GYM) || '1'; }
 
 function switchTab(tab){
   state.tab = tab;
@@ -129,7 +147,13 @@ function renderHome(){
     <h2>📷 今日のトレーニングを記録</h2>
     <div class="sub" style="margin-bottom:12px">「筋トレMEMO」のサマリー画面を撮影 or 選択してください</div>`;
   if(state.pendingImage){
+    if(state.selectedGym===null) state.selectedGym = getLastGym();
     html += `<img class="preview-img" src="${state.pendingImage}">`;
+    html += `<div class="field"><label>次回はどちらのジムに行く予定？（次回メニューの設備制約に使用）</label>
+      <div class="seg">
+        <button data-gym="1" class="gym-btn${state.selectedGym==='1'?' sel':''}">志村坂上店</button>
+        <button data-gym="2" class="gym-btn${state.selectedGym==='2'?' sel':''}">本郷三丁目店</button>
+      </div></div>`;
     html += `<button class="btn btn-primary" id="btnEvaluate">🤖 AI評価を実行</button>`;
     html += `<button class="btn btn-ghost" id="btnRetake">撮り直す</button>`;
   } else {
@@ -159,6 +183,7 @@ function renderResult(result, isPending){
   if(result.next_menu){
     const nm = result.next_menu;
     html += `<div class="card"><h2>🎯 次回のトレーニングメニュー</h2>`;
+    if(nm.gym){ html += `<div class="sub" style="margin-bottom:6px">📍 ${escapeHtml(nm.gym)}</div>`; }
     html += `<div class="menu-focus">${escapeHtml(nm.focus||'')}</div>`;
     (nm.exercises||[]).forEach(ex=>{
       html += `<div class="menu-ex"><div class="n">${escapeHtml(ex.name)}</div><div class="t">${escapeHtml(ex.target||'')}</div></div>`;
@@ -189,9 +214,10 @@ function renderHistory(){
   let html = '<div class="card">';
   sessions.slice().reverse().forEach(s=>{
     const names = (s.exercises||[]).map(e=>e.name).join('、');
+    const nextFocus = s.next_menu ? `　→次回: ${s.next_menu.focus||''}` : '';
     html += `<div class="hist-item" data-id="${s.id}">
       <div class="hist-date">${escapeHtml(s.date||'')}</div>
-      <div class="hist-summary">${escapeHtml(names)}</div>
+      <div class="hist-summary">${escapeHtml(names)}${escapeHtml(nextFocus)}</div>
     </div>`;
   });
   html += '</div>';
@@ -212,6 +238,20 @@ function renderSettings(){
     </div>
     <button class="btn btn-primary" id="btnSaveSettings">保存</button>
     <div id="settingsSaved" class="center-msg" style="display:none;color:var(--ok)">✓ 保存しました</div>
+  </div>
+  <div class="card">
+    <h2>🏋️ ジム設備（次回メニュー提案の制約に使用）</h2>
+    <div class="field">
+      <label>${escapeHtml(GYM_NAMES['1'])}</label>
+      <textarea id="inputEquip1" style="min-height:140px">${escapeHtml(getGymEquip('1'))}</textarea>
+    </div>
+    <div class="field">
+      <label>${escapeHtml(GYM_NAMES['2'])}</label>
+      <textarea id="inputEquip2" style="min-height:140px">${escapeHtml(getGymEquip('2'))}</textarea>
+    </div>
+    <div class="sub" style="margin-bottom:10px">設備リストはWeb情報を元にした概算です。実際と異なる場合はここで編集してください。</div>
+    <button class="btn btn-primary" id="btnSaveEquip">設備リストを保存</button>
+    <div id="equipSaved" class="center-msg" style="display:none;color:var(--ok)">✓ 保存しました</div>
   </div>`;
 }
 
@@ -223,6 +263,10 @@ function bindEvents(){
 
   const btnRetake = document.getElementById('btnRetake');
   if(btnRetake) btnRetake.onclick = ()=>{ state.pendingImage=null; state.pendingImageB64=null; render(); };
+
+  document.querySelectorAll('.gym-btn').forEach(b=>{
+    b.onclick = ()=>{ state.selectedGym = b.dataset.gym; render(); };
+  });
 
   const btnEvaluate = document.getElementById('btnEvaluate');
   if(btnEvaluate) btnEvaluate.onclick = runEvaluation;
@@ -246,6 +290,15 @@ function bindEvents(){
     localStorage.setItem(LS_KEY_APIKEY, document.getElementById('inputApiKey').value.trim());
     localStorage.setItem(LS_KEY_CONDITION, document.getElementById('inputCondition').value.trim());
     const msg = document.getElementById('settingsSaved');
+    msg.style.display='block';
+    setTimeout(()=>{ msg.style.display='none'; }, 1800);
+  };
+
+  const btnSaveEquip = document.getElementById('btnSaveEquip');
+  if(btnSaveEquip) btnSaveEquip.onclick = ()=>{
+    localStorage.setItem(LS_KEY_GYM_EQUIP_1, document.getElementById('inputEquip1').value.trim());
+    localStorage.setItem(LS_KEY_GYM_EQUIP_2, document.getElementById('inputEquip2').value.trim());
+    const msg = document.getElementById('equipSaved');
     msg.style.display='block';
     setTimeout(()=>{ msg.style.display='none'; }, 1800);
   };
@@ -308,7 +361,7 @@ function downscaleImage(file, maxWidth, quality){
   });
 }
 
-function buildSystemPrompt(){
+function buildSystemPrompt(gymId){
   const sessions = getSessions().slice(-3);
   let historyText = 'なし（初回の記録です）';
   if(sessions.length>0){
@@ -317,6 +370,8 @@ function buildSystemPrompt(){
       return `${s.date}: ${names} / 評価メモ: ${(s.evaluation||'').slice(0,80)}`;
     }).join('\n');
   }
+  const gymName = GYM_NAMES[gymId];
+  const gymEquip = getGymEquip(gymId);
   return `あなたは経験豊富なパーソナルトレーナーです。ユーザーの筋トレ記録アプリ「筋トレMEMO」のサマリー画面の写真から、その日のトレーニング内容を正確に読み取り、評価と次回のトレーニングメニューを提案してください。
 
 【ユーザー情報】
@@ -324,6 +379,11 @@ ${getCondition()}
 
 【直近のセッション履歴（参考・漸進性の判断に使用）】
 ${historyText}
+
+【次回トレーニングを行うジム】${gymName}
+【このジムの設備】
+${gymEquip}
+次回メニューの種目は、必ず上記の設備のみで実施できるものにしてください。設備にない種目（例: そのジムにケーブルマシンしか無いのにラットプルダウンを提案する、等）は提案しないでください。
 
 【出力ルール】
 以下のJSON形式のみを出力してください。説明文やMarkdownのコードフェンス(\`\`\`)は一切付けないでください。
@@ -334,9 +394,10 @@ ${historyText}
   ],
   "evaluation": "このセッションの評価。前回までの履歴と比較した進捗、頑張った点、フォームや強度に関する注意点などを2〜4文で。日本語。",
   "next_menu": {
+    "gym": "${gymName}",
     "focus": "次回トレーニングの部位・テーマ（例: 背中・二頭筋中心）",
     "exercises": [
-      {"name": "種目名", "target": "目安（例: 3-4セット×10-15回、22kg前後から開始）"}
+      {"name": "種目名（必ず上記設備リストにあるもののみ）", "target": "目安（例: 3-4セット×10-15回、22kg前後から開始）"}
     ],
     "notes": "怪我への配慮、漸進性、フォームなどに関する補足を1〜2文で。"
   }
@@ -347,6 +408,8 @@ async function runEvaluation(){
   state.loading = true; state.error = null; render();
   try{
     const apiKey = getApiKey();
+    const gymId = state.selectedGym || getLastGym();
+    localStorage.setItem(LS_KEY_LAST_GYM, gymId);
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -358,7 +421,7 @@ async function runEvaluation(){
       body: JSON.stringify({
         model: 'claude-sonnet-5',
         max_tokens: 2000,
-        system: buildSystemPrompt(),
+        system: buildSystemPrompt(gymId),
         messages: [{
           role: 'user',
           content: [
