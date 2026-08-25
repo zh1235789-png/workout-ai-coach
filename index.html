@@ -187,7 +187,9 @@ function renderResult(result, isPending){
   }
 
   if(isPending){
-    html += `<div class="card"><button class="btn btn-primary" id="btnSave">履歴に保存</button>
+    html += `<div class="card">`;
+    if(state.error){ html += `<div class="err-box">${escapeHtml(state.error)}</div>`; }
+    html += `<button class="btn btn-primary" id="btnSave">履歴に保存</button>
       <button class="btn btn-ghost" id="btnDiscard">破棄してやり直す</button></div>`;
   }
   return html;
@@ -280,13 +282,22 @@ function bindEvents(){
 
   const btnSave = document.getElementById('btnSave');
   if(btnSave) btnSave.onclick = ()=>{
-    const sessions = getSessions();
-    const result = state.pendingResult;
-    result.id = Date.now().toString();
-    sessions.push(result);
-    saveSessions(sessions);
-    state.pendingResult = null;
-    switchTab('history');
+    try{
+      const sessions = getSessions();
+      const result = state.pendingResult;
+      result.id = Date.now().toString();
+      sessions.push(result);
+      saveSessions(sessions);
+      const check = getSessions();
+      if(!check.some(s=>s.id===result.id)){
+        throw new Error('保存を確認できませんでした');
+      }
+      state.pendingResult = null;
+      switchTab('history');
+    }catch(err){
+      state.error = '保存に失敗しました: ' + err.message + '（プライベートブラウズモードや、ストレージ容量の上限が原因の可能性があります）';
+      render();
+    }
   };
 
   const btnDiscard = document.getElementById('btnDiscard');
