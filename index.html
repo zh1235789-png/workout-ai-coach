@@ -97,6 +97,7 @@ const LS_KEY_LAST_GYM = 'wac_last_gym';
 const DEFAULT_CONDITION = '左ハムストリング肉離れ(2026-07-04受傷)からリハビリ中。脚トレは控えめ・痛みが出ない範囲で漸進的に。目的は健康維持・筋力向上・体脂肪率の低下。筋トレ週3-4回、有酸素運動(ランニング・ウォーキング)週3-4回。';
 
 const GYM_NAMES = { '1': 'エニタイムフィットネス志村坂上店', '2': 'エニタイムフィットネス文京本郷店（本郷三丁目）' };
+const CARDIO_LABELS = { 'none': 'なし', 'walk': 'ウォーキング', 'run': 'ランニング' };
 const DEFAULT_EQUIP_1 = `【マシンエリア】レッグエクステンション、レッグカール、レッグプレス、インナーサイ/アウターサイ、ショルダープレス、チェストプレス、シーテッドロウ、プルダウン(2台)、ロータリートルソー、アブドミナル、インクラインプレス、アングルドレッグプレス、ペクトラル・フライ/リア・デルトイド、グルード・ブリッジ
 【フリーウェイトエリア】DPLシーテッドロウ、DPLショルダープレス、デッドリフトエリート、パワーラック(2台)、スミスマシン、ケーブルマシン、プリチャーカール、シーテッドアームカール、アジャスタブルベンチ(3台)、フラットベンチ、ダンベル(1〜50kg)、ディップ/チンアシスト、アイソラテラル系マシン各種、Tバーロウ、ラテラルレイズ、ハックスクワット
 【有酸素】ステアクライマー、トレッドミル(8台)、リカンベントバイク(2台)、アップライトバイク(2台)、クロストレーナー(2台)
@@ -106,7 +107,7 @@ const DEFAULT_EQUIP_2 = `【筋トレマシン(PRECOR製)】ペクトラルフ�
 【有酸素(PRECOR製)】トレッドミル(8台)、クロストレーナー(2台)、リカンベントバイク(2台)、アップライトバイク(2台)
 【その他】ストレッチエリア、体組成計`;
 
-let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, viewingSession: null };
+let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, viewingSession: null };
 
 function getSessions(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_SESSIONS)||'[]'); }catch(e){ return []; } }
 function saveSessions(list){ localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list)); }
@@ -116,7 +117,7 @@ function getLastGym(){ return localStorage.getItem(LS_KEY_LAST_GYM) || '1'; }
 
 function switchTab(tab){
   state.tab = tab;
-  state.pendingResult = null; state.error = null; state.viewingSession = null;
+  state.pendingResult = null; state.error = null; state.viewingSession = null; state.cardio = null;
   render();
 }
 
@@ -131,6 +132,7 @@ function render(){
 
 function renderHome(){
   if(state.selectedGym===null) state.selectedGym = getLastGym();
+  if(state.cardio===null) state.cardio = 'none';
   if(state.pendingResult){
     return renderResult(state.pendingResult, true);
   }
@@ -139,6 +141,15 @@ function renderHome(){
     <div class="seg">
       <button data-gym="1" class="gym-btn${state.selectedGym==='1'?' sel':''}">志村坂上店</button>
       <button data-gym="2" class="gym-btn${state.selectedGym==='2'?' sel':''}">本郷三丁目店</button>
+    </div>
+  </div>`;
+
+  html += `<div class="card">
+    <h2>🏃 今日の有酸素運動</h2>
+    <div class="seg">
+      <button data-cardio="none" class="cardio-btn${state.cardio==='none'?' sel':''}">なし</button>
+      <button data-cardio="walk" class="cardio-btn${state.cardio==='walk'?' sel':''}">ウォーキング</button>
+      <button data-cardio="run" class="cardio-btn${state.cardio==='run'?' sel':''}">ランニング</button>
     </div>
   </div>`;
 
@@ -165,6 +176,9 @@ function renderResult(result, isPending){
   let html = '<div class="card">';
   if(isPending){ html += `<div class="saved-badge">✓ 解析完了</div>`; }
   html += `<h2>📊 抽出した記録${result.date ? ' — '+escapeHtml(result.date) : ''}</h2>`;
+  if(result.cardio && result.cardio!=='none'){
+    html += `<div class="sub" style="margin-bottom:8px">🏃 この日の有酸素: ${escapeHtml(CARDIO_LABELS[result.cardio]||result.cardio)}</div>`;
+  }
   (result.exercises||[]).forEach(ex=>{
     html += `<div class="ex-row"><div class="ex-name">${escapeHtml(ex.name)}${ex.maxRM?`<span class="ex-max">MAX 1RM ${ex.maxRM}kg</span>`:''}</div>`;
     html += `<div class="ex-sets">`;
@@ -179,6 +193,7 @@ function renderResult(result, isPending){
     const nm = result.next_menu;
     html += `<div class="card"><h2>🎯 次回のトレーニングメニュー</h2>`;
     if(nm.gym){ html += `<div class="sub" style="margin-bottom:6px">📍 ${escapeHtml(nm.gym)}</div>`; }
+    if(nm.category){ html += `<span class="ex-max" style="margin-left:0;margin-bottom:6px;display:inline-block">${escapeHtml(nm.category)}</span>`; }
     html += `<div class="menu-focus">${escapeHtml(nm.focus||'')}</div>`;
     if((nm.must_exercises||[]).length){
       html += `<div class="menu-group-label">🔴 必須</div>`;
@@ -221,8 +236,9 @@ function renderHistory(){
   sessions.slice().reverse().forEach(s=>{
     const names = (s.exercises||[]).map(e=>e.name).join('、');
     const nextFocus = s.next_menu ? `　→次回: ${s.next_menu.focus||''}` : '';
+    const cardioIcon = s.cardio==='run' ? '🏃' : (s.cardio==='walk' ? '🚶' : '');
     html += `<div class="hist-item" data-id="${s.id}">
-      <div class="hist-date">${escapeHtml(s.date||'')}</div>
+      <div class="hist-date">${escapeHtml(s.date||'')} ${cardioIcon}</div>
       <div class="hist-summary">${escapeHtml(names)}${escapeHtml(nextFocus)}</div>
     </div>`;
   });
@@ -267,9 +283,13 @@ function bindEvents(){
     };
   });
 
+  document.querySelectorAll('.cardio-btn').forEach(b=>{
+    b.onclick = ()=>{ state.cardio = b.dataset.cardio; render(); };
+  });
+
   const btnCopyPrompt = document.getElementById('btnCopyPrompt');
   if(btnCopyPrompt) btnCopyPrompt.onclick = async ()=>{
-    const prompt = buildPrompt(state.selectedGym);
+    const prompt = buildPrompt(state.selectedGym, state.cardio);
     await copyToClipboard(prompt);
     const msg = document.getElementById('copyDone');
     msg.style.display='block';
@@ -296,6 +316,7 @@ function bindEvents(){
       const sessions = getSessions();
       const result = state.pendingResult;
       result.id = Date.now().toString();
+      result.cardio = state.cardio || 'none';
       sessions.push(result);
       saveSessions(sessions);
       const check = getSessions();
@@ -370,24 +391,38 @@ function parseClaudeJson(text){
   return JSON.parse(t);
 }
 
-function buildPrompt(gymId){
+function buildPrompt(gymId, cardio){
   const sessions = getSessions().slice(-3);
   let historyText = 'なし（初回の記録です）';
   if(sessions.length>0){
     historyText = sessions.map(s=>{
       const names = (s.exercises||[]).map(e=>e.name).join('、');
-      return `${s.date}: ${names} / 評価メモ: ${(s.evaluation||'').slice(0,80)}`;
+      const cat = s.next_menu && s.next_menu.category ? s.next_menu.category : '不明';
+      const cardioLabel = CARDIO_LABELS[s.cardio] || '記録なし';
+      return `${s.date}: [${names}] 前回提案カテゴリ=${cat} / その日の有酸素=${cardioLabel} / 評価メモ: ${(s.evaluation||'').slice(0,80)}`;
     }).join('\n');
   }
   const gymName = GYM_NAMES[gymId];
   const gymEquip = getGymEquip(gymId);
+  const cardioLabel = CARDIO_LABELS[cardio] || 'なし';
   return `あなたは経験豊富なパーソナルトレーナーです。添付した「筋トレMEMO」のサマリー画面の写真から、その日のトレーニング内容を正確に読み取り、評価と次回のトレーニングメニューを提案してください。
 
 【ユーザー情報】
 ${getCondition()}
+腹筋(アブドミナル、ロータリートルソー等)は自宅で別途鍛えているため、ジムでの提案は控えめにしてください（must_exercisesには含めず、optional_exercisesに含める場合も1種目までにする）。
 
-【直近のセッション履歴（参考・漸進性の判断に使用）】
+【3分割ローテーション】
+次回メニューのfocus/categoryは、必ず以下の3カテゴリのいずれか1つにしてください。
+- "Push": 胸・三頭筋・三角筋前部
+- "Pull": 背中(広背筋・僧帽筋)・二頭筋・三角筋後部
+- "Legs+": 三角筋中部・脚・その他
+直近のセッション履歴にある「前回提案カテゴリ」を参照し、同じカテゴリが連続しないよう、バランスよくローテーションしてください。
+
+【直近のセッション履歴（参考・漸進性とローテーション判断に使用）】
 ${historyText}
+
+【今日の有酸素運動】${cardioLabel}
+ランニングをした日は脚トレを行わない方針です。今日ランニングをしている場合、今回のトレーニング内容に脚種目が含まれていれば評価コメントで軽く触れてください。また、次回メニューのカテゴリが"Legs+"になる場合は、notesに必ず「ランニングをする予定の日は脚トレを避けてください」という趣旨の注意を含めてください。
 
 【次回トレーニングを行うジム】${gymName}
 【このジムの設備】
@@ -404,6 +439,7 @@ ${gymEquip}
   "evaluation": "このセッションの評価。前回までの履歴と比較した進捗、頑張った点、フォームや強度に関する注意点などを2〜4文で。日本語。",
   "next_menu": {
     "gym": "${gymName}",
+    "category": "Push または Pull または Legs+ のいずれか",
     "focus": "次回トレーニングの部位・テーマ（例: 背中・二頭筋中心）",
     "must_exercises": [
       {"name": "種目名（必ず上記設備リストにあるもののみ）", "target": "目安（例: 3-4セット×10-15回、22kg前後から開始）", "rest": "セット間のレスト時間（例: 60秒）"}
