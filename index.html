@@ -45,7 +45,7 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 .seg{display:flex;background:var(--bg);border-radius:10px;padding:3px;gap:3px}
 .seg button{flex:1;padding:9px 0;border:none;border-radius:8px;background:transparent;color:var(--sub);font-size:13px;font-weight:600}
 .seg button.sel{background:var(--card);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
-.preview-img{width:100%;border-radius:12px;margin-bottom:12px;border:1px solid var(--border)}
+.step-num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:700}
 .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:20px auto}
 @keyframes spin{to{transform:rotate(360deg)}}
 .center-msg{text-align:center;color:var(--sub);font-size:13px;padding:8px 0}
@@ -78,19 +78,17 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 <body>
 <header>
   <h1>💪 筋トレAIコーチ</h1>
-  <div class="sub" id="headerSub">筋トレMEMOの写真から評価&次回メニューを提案</div>
+  <div class="sub" id="headerSub">Claudeチャットと連携して評価&次回メニューを記録</div>
 </header>
 <main id="app"></main>
 <nav class="tabbar">
-  <button data-tab="home" class="tab-btn"><span class="ic">📷</span>記録</button>
+  <button data-tab="home" class="tab-btn"><span class="ic">📝</span>記録</button>
   <button data-tab="history" class="tab-btn"><span class="ic">📋</span>履歴</button>
   <button data-tab="settings" class="tab-btn"><span class="ic">⚙️</span>設定</button>
 </nav>
-<input type="file" id="fileInput" accept="image/*" capture="environment" style="display:none">
 
 <script>
 const LS_KEY_SESSIONS = 'wac_sessions';
-const LS_KEY_APIKEY = 'wac_apikey';
 const LS_KEY_CONDITION = 'wac_condition';
 const LS_KEY_GYM_EQUIP_1 = 'wac_gym_equip_1';
 const LS_KEY_GYM_EQUIP_2 = 'wac_gym_equip_2';
@@ -107,18 +105,17 @@ const DEFAULT_EQUIP_2 = `【筋トレマシン(PRECOR製)】ペクトラルフ�
 【有酸素(PRECOR製)】トレッドミル(8台)、クロストレーナー(2台)、リカンベントバイク(2台)、アップライトバイク(2台)
 【その他】ストレッチエリア、体組成計`;
 
-let state = { tab: 'home', pendingImage: null, pendingResult: null, loading: false, error: null, selectedGym: null };
+let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, viewingSession: null };
 
 function getSessions(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_SESSIONS)||'[]'); }catch(e){ return []; } }
 function saveSessions(list){ localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list)); }
-function getApiKey(){ return localStorage.getItem(LS_KEY_APIKEY) || ''; }
 function getCondition(){ return localStorage.getItem(LS_KEY_CONDITION) || DEFAULT_CONDITION; }
 function getGymEquip(id){ return localStorage.getItem(id==='1'?LS_KEY_GYM_EQUIP_1:LS_KEY_GYM_EQUIP_2) || (id==='1'?DEFAULT_EQUIP_1:DEFAULT_EQUIP_2); }
 function getLastGym(){ return localStorage.getItem(LS_KEY_LAST_GYM) || '1'; }
 
 function switchTab(tab){
   state.tab = tab;
-  state.pendingImage = null; state.pendingResult = null; state.error = null;
+  state.pendingResult = null; state.error = null; state.viewingSession = null;
   render();
 }
 
@@ -132,33 +129,30 @@ function render(){
 }
 
 function renderHome(){
-  if(!getApiKey()){
-    return `<div class="card">
-      <div class="err-box">APIキーが未設定です。「設定」タブでClaude APIキーを登録してください。</div>
-    </div>`;
-  }
-  if(state.loading){
-    return `<div class="card"><div class="spinner"></div><div class="center-msg">AIが写真を解析中...</div></div>`;
-  }
+  if(state.selectedGym===null) state.selectedGym = getLastGym();
   if(state.pendingResult){
     return renderResult(state.pendingResult, true);
   }
   let html = `<div class="card">
-    <h2>📷 今日のトレーニングを記録</h2>
-    <div class="sub" style="margin-bottom:12px">「筋トレMEMO」のサマリー画面を撮影 or 選択してください</div>`;
-  if(state.pendingImage){
-    if(state.selectedGym===null) state.selectedGym = getLastGym();
-    html += `<img class="preview-img" src="${state.pendingImage}">`;
-    html += `<div class="field"><label>次回はどちらのジムに行く予定？（次回メニューの設備制約に使用）</label>
-      <div class="seg">
-        <button data-gym="1" class="gym-btn${state.selectedGym==='1'?' sel':''}">志村坂上店</button>
-        <button data-gym="2" class="gym-btn${state.selectedGym==='2'?' sel':''}">本郷三丁目店</button>
-      </div></div>`;
-    html += `<button class="btn btn-primary" id="btnEvaluate">🤖 AI評価を実行</button>`;
-    html += `<button class="btn btn-ghost" id="btnRetake">撮り直す</button>`;
-  } else {
-    html += `<button class="btn btn-primary" id="btnPick">写真を選ぶ / 撮影</button>`;
-  }
+    <h2>📍 次回行くジム</h2>
+    <div class="seg">
+      <button data-gym="1" class="gym-btn${state.selectedGym==='1'?' sel':''}">志村坂上店</button>
+      <button data-gym="2" class="gym-btn${state.selectedGym==='2'?' sel':''}">本郷三丁目店</button>
+    </div>
+  </div>`;
+
+  html += `<div class="card">
+    <h2><span class="step-num">1</span> プロンプトをコピー</h2>
+    <div class="sub" style="margin-bottom:12px">コピーしたら、Claudeとのチャットに「筋トレMEMO」の写真と一緒に貼り付けて送ってください。</div>
+    <button class="btn btn-primary" id="btnCopyPrompt">📋 プロンプトをコピー</button>
+    <div id="copyDone" class="center-msg" style="display:none;color:var(--ok)">✓ コピーしました</div>
+  </div>`;
+
+  html += `<div class="card">
+    <h2><span class="step-num">2</span> Claudeの回答を貼り付け</h2>
+    <div class="sub" style="margin-bottom:8px">Claudeが返したJSON形式の回答をそのまま貼り付けてください。</div>
+    <textarea id="inputPaste" placeholder='{"date": "...", "exercises": [...], ...}'></textarea>
+    <button class="btn btn-primary" id="btnParse" style="margin-top:10px">貼り付けた内容を解析</button>`;
   if(state.error){
     html += `<div class="err-box" style="margin-top:12px">${escapeHtml(state.error)}</div>`;
   }
@@ -201,7 +195,7 @@ function renderResult(result, isPending){
 
 function renderHistory(){
   const sessions = getSessions();
-  if(state.pendingResult===null && state.viewingSession){
+  if(state.viewingSession){
     const s = state.viewingSession;
     let html = `<div class="card"><span class="detail-close" id="btnCloseDetail">閉じる ✕</span><div style="clear:both"></div></div>`;
     html += renderResult(s, false);
@@ -227,20 +221,15 @@ function renderHistory(){
 function renderSettings(){
   return `<div class="card">
     <div class="field">
-      <label>Claude APIキー</label>
-      <input type="password" id="inputApiKey" placeholder="sk-ant-..." value="${escapeAttr(getApiKey())}">
-      <div class="sub" style="margin-top:6px">console.anthropic.com で発行したAPIキーを入力してください。このデバイスのブラウザにのみ保存されます。</div>
-    </div>
-    <div class="field">
-      <label>現在のコンディション・目標（AIへの申し送り事項）</label>
+      <label>現在のコンディション・目標（Claudeへの申し送り事項）</label>
       <textarea id="inputCondition">${escapeHtml(getCondition())}</textarea>
-      <div class="sub" style="margin-top:6px">怪我の状態や目標が変わったらここを更新してください。次回のメニュー提案に反映されます。</div>
+      <div class="sub" style="margin-top:6px">怪我の状態や目標が変わったらここを更新してください。コピーするプロンプトに反映されます。</div>
     </div>
     <button class="btn btn-primary" id="btnSaveSettings">保存</button>
     <div id="settingsSaved" class="center-msg" style="display:none;color:var(--ok)">✓ 保存しました</div>
   </div>
   <div class="card">
-    <h2>🏋️ ジム設備（次回メニュー提案の制約に使用）</h2>
+    <h2>🏋️ ジム設備（プロンプトに含める設備制約）</h2>
     <div class="field">
       <label>${escapeHtml(GYM_NAMES['1'])}</label>
       <textarea id="inputEquip1" style="min-height:140px">${escapeHtml(getGymEquip('1'))}</textarea>
@@ -258,18 +247,36 @@ function renderSettings(){
 function bindEvents(){
   document.querySelectorAll('.tab-btn').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
 
-  const btnPick = document.getElementById('btnPick');
-  if(btnPick) btnPick.onclick = ()=> document.getElementById('fileInput').click();
-
-  const btnRetake = document.getElementById('btnRetake');
-  if(btnRetake) btnRetake.onclick = ()=>{ state.pendingImage=null; state.pendingImageB64=null; render(); };
-
   document.querySelectorAll('.gym-btn').forEach(b=>{
-    b.onclick = ()=>{ state.selectedGym = b.dataset.gym; render(); };
+    b.onclick = ()=>{
+      state.selectedGym = b.dataset.gym;
+      localStorage.setItem(LS_KEY_LAST_GYM, b.dataset.gym);
+      render();
+    };
   });
 
-  const btnEvaluate = document.getElementById('btnEvaluate');
-  if(btnEvaluate) btnEvaluate.onclick = runEvaluation;
+  const btnCopyPrompt = document.getElementById('btnCopyPrompt');
+  if(btnCopyPrompt) btnCopyPrompt.onclick = async ()=>{
+    const prompt = buildPrompt(state.selectedGym);
+    await copyToClipboard(prompt);
+    const msg = document.getElementById('copyDone');
+    msg.style.display='block';
+    setTimeout(()=>{ msg.style.display='none'; }, 1800);
+  };
+
+  const btnParse = document.getElementById('btnParse');
+  if(btnParse) btnParse.onclick = ()=>{
+    const raw = document.getElementById('inputPaste').value;
+    try{
+      const result = parseClaudeJson(raw);
+      state.pendingResult = result;
+      state.error = null;
+      render();
+    }catch(e){
+      state.error = '解析に失敗しました。貼り付けた内容がJSON形式か確認してください。';
+      render();
+    }
+  };
 
   const btnSave = document.getElementById('btnSave');
   if(btnSave) btnSave.onclick = ()=>{
@@ -278,16 +285,15 @@ function bindEvents(){
     result.id = Date.now().toString();
     sessions.push(result);
     saveSessions(sessions);
-    state.pendingImage = null; state.pendingResult = null;
+    state.pendingResult = null;
     switchTab('history');
   };
 
   const btnDiscard = document.getElementById('btnDiscard');
-  if(btnDiscard) btnDiscard.onclick = ()=>{ state.pendingImage=null; state.pendingResult=null; render(); };
+  if(btnDiscard) btnDiscard.onclick = ()=>{ state.pendingResult=null; render(); };
 
   const btnSaveSettings = document.getElementById('btnSaveSettings');
   if(btnSaveSettings) btnSaveSettings.onclick = ()=>{
-    localStorage.setItem(LS_KEY_APIKEY, document.getElementById('inputApiKey').value.trim());
     localStorage.setItem(LS_KEY_CONDITION, document.getElementById('inputCondition').value.trim());
     const msg = document.getElementById('settingsSaved');
     msg.style.display='block';
@@ -323,45 +329,27 @@ function bindEvents(){
   };
 }
 
-document.getElementById('fileInput').addEventListener('change', async (e)=>{
-  const file = e.target.files[0];
-  if(!file) return;
-  try{
-    const {dataUrl, base64} = await downscaleImage(file, 1200, 0.85);
-    state.pendingImage = dataUrl;
-    state.pendingImageB64 = base64;
-    state.error = null;
-    render();
-  }catch(err){
-    state.error = '画像の読み込みに失敗しました: ' + err.message;
-    render();
+async function copyToClipboard(text){
+  if(navigator.clipboard && window.isSecureContext){
+    try{ await navigator.clipboard.writeText(text); return; }catch(e){ /* fall through */ }
   }
-  e.target.value = '';
-});
-
-function downscaleImage(file, maxWidth, quality){
-  return new Promise((resolve, reject)=>{
-    const reader = new FileReader();
-    reader.onerror = ()=> reject(new Error('read error'));
-    reader.onload = ()=>{
-      const img = new Image();
-      img.onerror = ()=> reject(new Error('decode error'));
-      img.onload = ()=>{
-        let w = img.width, h = img.height;
-        if(w > maxWidth){ h = Math.round(h * maxWidth / w); w = maxWidth; }
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
-        resolve({ dataUrl, base64: dataUrl.split(',')[1] });
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
-  });
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
 }
 
-function buildSystemPrompt(gymId){
+function parseClaudeJson(text){
+  let t = text.trim();
+  t = t.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```\s*$/, '');
+  return JSON.parse(t);
+}
+
+function buildPrompt(gymId){
   const sessions = getSessions().slice(-3);
   let historyText = 'なし（初回の記録です）';
   if(sessions.length>0){
@@ -372,7 +360,7 @@ function buildSystemPrompt(gymId){
   }
   const gymName = GYM_NAMES[gymId];
   const gymEquip = getGymEquip(gymId);
-  return `あなたは経験豊富なパーソナルトレーナーです。ユーザーの筋トレ記録アプリ「筋トレMEMO」のサマリー画面の写真から、その日のトレーニング内容を正確に読み取り、評価と次回のトレーニングメニューを提案してください。
+  return `あなたは経験豊富なパーソナルトレーナーです。添付した「筋トレMEMO」のサマリー画面の写真から、その日のトレーニング内容を正確に読み取り、評価と次回のトレーニングメニューを提案してください。
 
 【ユーザー情報】
 ${getCondition()}
@@ -383,7 +371,7 @@ ${historyText}
 【次回トレーニングを行うジム】${gymName}
 【このジムの設備】
 ${gymEquip}
-次回メニューの種目は、必ず上記の設備のみで実施できるものにしてください。設備にない種目（例: そのジムにケーブルマシンしか無いのにラットプルダウンを提案する、等）は提案しないでください。
+次回メニューの種目は、必ず上記の設備のみで実施できるものにしてください。設備にない種目は提案しないでください。
 
 【出力ルール】
 以下のJSON形式のみを出力してください。説明文やMarkdownのコードフェンス(\`\`\`)は一切付けないでください。
@@ -404,55 +392,9 @@ ${gymEquip}
 }`;
 }
 
-async function runEvaluation(){
-  state.loading = true; state.error = null; render();
-  try{
-    const apiKey = getApiKey();
-    const gymId = state.selectedGym || getLastGym();
-    localStorage.setItem(LS_KEY_LAST_GYM, gymId);
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-5',
-        max_tokens: 2000,
-        system: buildSystemPrompt(gymId),
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: state.pendingImageB64 } },
-            { type: 'text', text: 'この筋トレ記録の写真を解析し、指定されたJSON形式で評価と次回メニューを出力してください。' }
-          ]
-        }]
-      })
-    });
-    if(!resp.ok){
-      const errBody = await resp.text();
-      throw new Error(`APIエラー (${resp.status}): ${errBody.slice(0,200)}`);
-    }
-    const data = await resp.json();
-    let text = data.content[0].text.trim();
-    text = text.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```\s*$/, '');
-    const result = JSON.parse(text);
-    state.pendingResult = result;
-    state.loading = false;
-    render();
-  }catch(err){
-    state.loading = false;
-    state.error = '解析に失敗しました: ' + err.message;
-    render();
-  }
-}
-
 function escapeHtml(s){
   return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-function escapeAttr(s){ return escapeHtml(s); }
 
 render();
 </script>
