@@ -107,7 +107,7 @@ const DEFAULT_EQUIP_2 = `【筋トレマシン(PRECOR製)】ペクトラルフ�
 【有酸素(PRECOR製)】トレッドミル(8台)、クロストレーナー(2台)、リカンベントバイク(2台)、アップライトバイク(2台)
 【その他】ストレッチエリア、体組成計`;
 
-let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, viewingSession: null };
+let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null };
 
 function getSessions(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_SESSIONS)||'[]'); }catch(e){ return []; } }
 function saveSessions(list){ localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list)); }
@@ -117,7 +117,7 @@ function getLastGym(){ return localStorage.getItem(LS_KEY_LAST_GYM) || '1'; }
 
 function switchTab(tab){
   state.tab = tab;
-  state.pendingResult = null; state.error = null; state.viewingSession = null; state.cardio = null;
+  state.pendingResult = null; state.error = null; state.viewingSession = null; state.cardio = null; state.cardioLogDate = null;
   render();
 }
 
@@ -144,13 +144,21 @@ function renderHome(){
     </div>
   </div>`;
 
+  if(state.cardioLogDate===null || state.cardioLogDate===undefined) state.cardioLogDate = todayStr();
   html += `<div class="card">
     <h2>🏃 今日の有酸素運動</h2>
+    <div class="sub" style="margin-bottom:8px">筋トレと同じ日に走った/歩いたかを選んでください。プロンプトに含まれ、次回メニューの判断にも使われます。</div>
     <div class="seg">
       <button data-cardio="none" class="cardio-btn${state.cardio==='none'?' sel':''}">なし</button>
       <button data-cardio="walk" class="cardio-btn${state.cardio==='walk'?' sel':''}">ウォーキング</button>
       <button data-cardio="run" class="cardio-btn${state.cardio==='run'?' sel':''}">ランニング</button>
     </div>
+    <div class="field" style="margin-top:12px;margin-bottom:0">
+      <label>筋トレなしで有酸素だけ記録したい日</label>
+      <input type="date" id="inputCardioDate" value="${escapeAttr(state.cardioLogDate)}">
+    </div>
+    <button class="btn btn-secondary" id="btnLogCardioOnly" style="margin-top:10px">この内容だけ記録する（筋トレなし）</button>
+    <div id="cardioLogSaved" class="center-msg" style="display:none;color:var(--ok)">✓ 記録しました</div>
   </div>`;
 
   html += `<div class="card">
@@ -225,7 +233,11 @@ function renderHistory(){
   if(state.viewingSession){
     const s = state.viewingSession;
     let html = `<div class="card"><span class="detail-close" id="btnCloseDetail">閉じる ✕</span><div style="clear:both"></div></div>`;
-    html += renderResult(s, false);
+    if(s.type==='cardio'){
+      html += `<div class="card"><h2>${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}</h2><div class="sub">${escapeHtml(s.date||'')}（筋トレなし・有酸素のみの記録）</div></div>`;
+    } else {
+      html += renderResult(s, false);
+    }
     html += `<div class="card"><button class="btn btn-ghost" id="btnDeleteSession">この記録を削除</button></div>`;
     return html;
   }
@@ -234,12 +246,18 @@ function renderHistory(){
   }
   let html = '<div class="card">';
   sessions.slice().reverse().forEach(s=>{
-    const names = (s.exercises||[]).map(e=>e.name).join('、');
-    const nextFocus = s.next_menu ? `　→次回: ${s.next_menu.focus||''}` : '';
     const cardioIcon = s.cardio==='run' ? '🏃' : (s.cardio==='walk' ? '🚶' : '');
+    let summary;
+    if(s.type==='cardio'){
+      summary = `${s.cardio==='run'?'ランニング':'ウォーキング'}のみ（筋トレなし）`;
+    } else {
+      const names = (s.exercises||[]).map(e=>e.name).join('、');
+      const nextFocus = s.next_menu ? `　→次回: ${s.next_menu.focus||''}` : '';
+      summary = escapeHtml(names) + escapeHtml(nextFocus);
+    }
     html += `<div class="hist-item" data-id="${s.id}">
       <div class="hist-date">${escapeHtml(s.date||'')} ${cardioIcon}</div>
-      <div class="hist-summary">${escapeHtml(names)}${escapeHtml(nextFocus)}</div>
+      <div class="hist-summary">${summary}</div>
     </div>`;
   });
   html += '</div>';
@@ -286,6 +304,35 @@ function bindEvents(){
   document.querySelectorAll('.cardio-btn').forEach(b=>{
     b.onclick = ()=>{ state.cardio = b.dataset.cardio; render(); };
   });
+
+  const inputCardioDate = document.getElementById('inputCardioDate');
+  if(inputCardioDate) inputCardioDate.onchange = ()=>{ state.cardioLogDate = inputCardioDate.value; };
+
+  const btnLogCardioOnly = document.getElementById('btnLogCardioOnly');
+  if(btnLogCardioOnly) btnLogCardioOnly.onclick = ()=>{
+    if(state.cardio==='none'){
+      state.error = '「なし」以外（ウォーキング or ランニング）を選んでから記録してください。';
+      render();
+      return;
+    }
+    try{
+      const sessions = getSessions();
+      const entry = {
+        id: Date.now().toString(),
+        type: 'cardio',
+        date: state.cardioLogDate || todayStr(),
+        cardio: state.cardio
+      };
+      sessions.push(entry);
+      saveSessions(sessions);
+      const msg = document.getElementById('cardioLogSaved');
+      msg.style.display = 'block';
+      setTimeout(()=>{ msg.style.display = 'none'; }, 1800);
+    }catch(err){
+      state.error = '記録に失敗しました: ' + err.message;
+      render();
+    }
+  };
 
   const btnCopyPrompt = document.getElementById('btnCopyPrompt');
   if(btnCopyPrompt) btnCopyPrompt.onclick = async ()=>{
@@ -392,10 +439,13 @@ function parseClaudeJson(text){
 }
 
 function buildPrompt(gymId, cardio){
-  const sessions = getSessions().slice(-3);
+  const sessions = getSessions().slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).slice(-5);
   let historyText = 'なし（初回の記録です）';
   if(sessions.length>0){
     historyText = sessions.map(s=>{
+      if(s.type==='cardio'){
+        return `${s.date}: 有酸素のみ（${CARDIO_LABELS[s.cardio]||s.cardio}）、筋トレなし`;
+      }
       const names = (s.exercises||[]).map(e=>e.name).join('、');
       const cat = s.next_menu && s.next_menu.category ? s.next_menu.category : '不明';
       const cardioLabel = CARDIO_LABELS[s.cardio] || '記録なし';
@@ -455,6 +505,12 @@ must_exercisesは「絶対にやるべき種目」を必ず4種目、optional_ex
 
 function escapeHtml(s){
   return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s){ return escapeHtml(s); }
+
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 
 render();
