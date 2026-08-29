@@ -60,18 +60,24 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 .menu-ex{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px dashed var(--border);font-size:13.5px}
 .menu-ex:last-child{border-bottom:none}
 .menu-ex .n{font-weight:600}
-.menu-ex .t{color:var(--sub);text-align:right}
+.menu-ex .t{color:var(--sub);text-align:right;flex-shrink:0}
+.menu-warm{font-size:11px;color:var(--warn);font-weight:normal;margin-top:2px}
 .menu-notes{margin-top:10px;background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:9px 10px;font-size:12.5px;line-height:1.6}
 /* workout entry */
-.entry-row{padding:8px 0;border-bottom:1px solid var(--border)}
+.entry-row{padding:10px 0;border-bottom:1px solid var(--border)}
 .entry-row:last-child{border-bottom:none}
-.entry-name{margin-bottom:6px}
-.entry-nums{display:flex;align-items:center;gap:5px}
-.entry-nums input{padding:8px;font-size:13px;text-align:center;min-width:0}
-.entry-weight,.entry-reps{flex:1}
-.entry-sets{flex:1}
+.entry-head{display:flex;gap:6px;align-items:center}
+.entry-name{flex:1}
+.entry-hint{font-size:11px;color:var(--sub);margin:5px 0 2px}
+.entry-del{background:transparent;border:1px solid var(--border);color:var(--sub);border-radius:8px;width:34px;height:38px;font-size:13px;flex-shrink:0;cursor:pointer}
+.set-row{display:flex;align-items:center;gap:5px;margin-top:6px}
+.set-row input{padding:8px;font-size:13px;text-align:center;min-width:0;flex:1}
+.set-label{width:38px;flex-shrink:0;font-size:11.5px;font-weight:700;color:var(--sub);text-align:center}
+.set-label.warm{color:var(--warn);font-size:10.5px}
 .entry-x{color:var(--sub);font-size:12px}
-.entry-del{background:transparent;border:1px solid var(--border);color:var(--sub);border-radius:8px;width:32px;height:34px;font-size:13px;flex-shrink:0;cursor:pointer}
+.set-del{background:transparent;border:1px solid var(--border);color:var(--sub);border-radius:8px;width:30px;height:34px;font-size:15px;flex-shrink:0;cursor:pointer;line-height:1}
+.set-add{background:transparent;border:1px dashed var(--border);color:var(--sub);border-radius:8px;padding:6px 0;width:100%;font-size:12px;margin-top:7px;cursor:pointer}
+.warm-hint{font-size:11px;color:var(--warn);margin:3px 0 0 43px}
 /* calendar */
 .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .cal-title{font-size:15px;font-weight:700}
@@ -160,45 +166,85 @@ function getLastStrengthSession(){
   return sessions.sort((a,b)=>(a.date||'').localeCompare(b.date||''))[sessions.length-1];
 }
 
-function emptyRow(){ return { name:'', weight:'', reps:'', sets:'' }; }
+function emptySet(){ return { weight:'', reps:'', warmup:false }; }
+function emptyRow(){ return { name:'', sets:[emptySet(), emptySet(), emptySet()] }; }
 
 function buildInitialEntryRows(){
   const last = getLastStrengthSession();
   const nm = last && last.next_menu;
-  const names = [];
+  const items = [];
   if(nm){
-    (nm.must_exercises||[]).forEach(e=>{ if(e.name) names.push(e.name); });
-    (nm.optional_exercises||[]).forEach(e=>{ if(e.name) names.push(e.name); });
+    (nm.must_exercises||[]).forEach(e=>{ if(e.name) items.push(e); });
+    (nm.optional_exercises||[]).forEach(e=>{ if(e.name) items.push(e); });
   }
-  if(names.length===0){
+  if(items.length===0){
     state.entryRowsFromMenu = false;
     return [emptyRow(), emptyRow(), emptyRow(), emptyRow()];
   }
   state.entryRowsFromMenu = true;
-  return names.map(n=>({ name:n, weight:'', reps:'', sets:'' }));
+  return items.map(e=>{
+    const w = e.warmup;
+    const warm = (w && (w.weight!=null || w.reps!=null)) ? w : null;
+    const sets = [];
+    if(warm){
+      sets.push({ weight: warm.weight!=null?String(warm.weight):'', reps: warm.reps!=null?String(warm.reps):'', warmup:true });
+    }
+    const n = countTargetSets(e.target);
+    for(let i=0;i<n;i++) sets.push(emptySet());
+    return { name: e.name, sets, hint: e.target||'', warmupHint: warm ? formatWarmupHint(warm) : '' };
+  });
+}
+
+function countTargetSets(target){
+  if(!target) return 3;
+  const m = String(target).match(/(\d+)\s*(?:[-〜~]\s*(\d+))?\s*セット/);
+  if(m) return Math.min(6, parseInt(m[2]||m[1], 10) || 3);
+  return 3;
+}
+
+function formatWarmupHint(w){
+  if(!w) return '';
+  const wt = w.weight!=null ? `${w.weight}kg` : '';
+  const rp = w.reps!=null ? `${w.reps}回` : '';
+  return [wt, rp].filter(Boolean).join(' × ');
 }
 
 function collectEntryRows(){
   const rows = [];
   document.querySelectorAll('.entry-row').forEach(el=>{
+    const sets = [];
+    el.querySelectorAll('.set-row').forEach(sEl=>{
+      sets.push({
+        weight: sEl.querySelector('.set-weight').value,
+        reps: sEl.querySelector('.set-reps').value,
+        warmup: sEl.dataset.warmup === '1'
+      });
+    });
     rows.push({
       name: el.querySelector('.entry-name').value,
-      weight: el.querySelector('.entry-weight').value,
-      reps: el.querySelector('.entry-reps').value,
-      sets: el.querySelector('.entry-sets').value
+      sets,
+      hint: el.dataset.hint || '',
+      warmupHint: el.dataset.warmupHint || ''
     });
   });
   return rows;
 }
 
 function entryRowsToText(rows){
-  const done = rows.filter(r=>r.name.trim() && (r.weight!=='' || r.reps!==''));
+  // 本番セット（アップ以外）が1つでも入力されている種目のみ「実施した」とみなす
+  const done = rows.filter(r=>r.name.trim() && r.sets.some(s=>!s.warmup && (s.weight!=='' || s.reps!=='')));
   if(done.length===0) return null;
   return done.map(r=>{
-    const setsPart = r.sets!=='' ? `${r.sets}セット × ` : '';
-    const wPart = r.weight!=='' ? `${r.weight}kg` : '自重';
-    const rPart = r.reps!=='' ? ` × ${r.reps}回` : '';
-    return `- ${r.name.trim()}: ${setsPart}${wPart}${rPart}`;
+    let workIdx = 0;
+    const lines = r.sets
+      .filter(s=>s.weight!=='' || s.reps!=='')
+      .map(s=>{
+        const wPart = s.weight!=='' ? `${s.weight}kg` : '自重';
+        const rPart = s.reps!=='' ? ` × ${s.reps}回` : '';
+        const label = s.warmup ? 'アップ' : 'セット'+(++workIdx);
+        return `    ${label}: ${wPart}${rPart}`;
+      });
+    return `- ${r.name.trim()}\n${lines.join('\n')}`;
   }).join('\n');
 }
 
@@ -248,15 +294,27 @@ function renderHome(){
     <div class="sub" style="margin-bottom:10px">${state.entryRowsFromMenu ? '前回提案したメニューを読み込みました。やった種目に重量・回数を入れてください（空欄の種目は「やらなかった」扱いになります）。' : '種目・重量・回数を入力してください。'}</div>
     <div id="entryRows">`;
   state.entryRows.forEach((r,i)=>{
-    html += `<div class="entry-row">
-      <input type="text" class="entry-name" data-i="${i}" placeholder="種目名" value="${escapeAttr(r.name)}">
-      <div class="entry-nums">
-        <input type="number" class="entry-weight" data-i="${i}" placeholder="kg" inputmode="decimal" value="${escapeAttr(r.weight)}">
+    html += `<div class="entry-row" data-i="${i}" data-hint="${escapeAttr(r.hint||'')}" data-warmup-hint="${escapeAttr(r.warmupHint||'')}">
+      <div class="entry-head">
+        <input type="text" class="entry-name" data-i="${i}" placeholder="種目名" value="${escapeAttr(r.name)}">
+        <button class="entry-del" data-i="${i}" title="種目を削除">✕</button>
+      </div>`;
+    if(r.hint){ html += `<div class="entry-hint">目安: ${escapeHtml(r.hint)}</div>`; }
+    let workIdx = 0;
+    (r.sets||[]).forEach((s,j)=>{
+      const label = s.warmup ? 'アップ' : String(++workIdx);
+      html += `<div class="set-row" data-i="${i}" data-j="${j}" data-warmup="${s.warmup?'1':'0'}">
+        <span class="set-label${s.warmup?' warm':''}">${label}</span>
+        <input type="number" class="set-weight" placeholder="kg" inputmode="decimal" value="${escapeAttr(s.weight)}">
         <span class="entry-x">×</span>
-        <input type="number" class="entry-reps" data-i="${i}" placeholder="回" inputmode="numeric" value="${escapeAttr(r.reps)}">
-        <input type="number" class="entry-sets" data-i="${i}" placeholder="セット" inputmode="numeric" value="${escapeAttr(r.sets)}">
-        <button class="entry-del" data-i="${i}" title="削除">✕</button>
-      </div>
+        <input type="number" class="set-reps" placeholder="回" inputmode="numeric" value="${escapeAttr(s.reps)}">
+        <button class="set-del" data-i="${i}" data-j="${j}" title="セットを削除">−</button>
+      </div>`;
+      if(s.warmup && r.warmupHint){
+        html += `<div class="warm-hint">↑ 推奨: ${escapeHtml(r.warmupHint)}</div>`;
+      }
+    });
+    html += `<button class="set-add" data-i="${i}">＋ セット追加</button>
     </div>`;
   });
   html += `</div>
@@ -309,13 +367,13 @@ function renderResult(result, isPending){
     if((nm.must_exercises||[]).length){
       html += `<div class="menu-group-label">🔴 必須</div>`;
       nm.must_exercises.forEach(ex=>{
-        html += `<div class="menu-ex"><div class="n">${escapeHtml(ex.name)}</div><div class="t">${escapeHtml(ex.target||'')}${ex.rest?`<br>レスト ${escapeHtml(ex.rest)}`:''}</div></div>`;
+        html += `<div class="menu-ex"><div class="n">${escapeHtml(ex.name)}${ex.warmup&&(ex.warmup.weight!=null||ex.warmup.reps!=null)?`<div class="menu-warm">アップ: ${escapeHtml(formatWarmupHint(ex.warmup))}</div>`:''}</div><div class="t">${escapeHtml(ex.target||'')}${ex.rest?`<br>レスト ${escapeHtml(ex.rest)}`:''}</div></div>`;
       });
     }
     if((nm.optional_exercises||[]).length){
       html += `<div class="menu-group-label">🟡 余裕があれば</div>`;
       nm.optional_exercises.forEach(ex=>{
-        html += `<div class="menu-ex"><div class="n">${escapeHtml(ex.name)}</div><div class="t">${escapeHtml(ex.target||'')}${ex.rest?`<br>レスト ${escapeHtml(ex.rest)}`:''}</div></div>`;
+        html += `<div class="menu-ex"><div class="n">${escapeHtml(ex.name)}${ex.warmup&&(ex.warmup.weight!=null||ex.warmup.reps!=null)?`<div class="menu-warm">アップ: ${escapeHtml(formatWarmupHint(ex.warmup))}</div>`:''}</div><div class="t">${escapeHtml(ex.target||'')}${ex.rest?`<br>レスト ${escapeHtml(ex.rest)}`:''}</div></div>`;
       });
     }
     if(nm.notes){ html += `<div class="menu-notes">⚠️ ${escapeHtml(nm.notes)}</div>`; }
@@ -532,6 +590,26 @@ function bindEvents(){
     };
   });
 
+  document.querySelectorAll('.set-add').forEach(b=>{
+    b.onclick = ()=>{
+      const rows = collectEntryRows();
+      rows[parseInt(b.dataset.i,10)].sets.push(emptySet());
+      state.entryRows = rows;
+      render();
+    };
+  });
+
+  document.querySelectorAll('.set-del').forEach(b=>{
+    b.onclick = ()=>{
+      const rows = collectEntryRows();
+      const row = rows[parseInt(b.dataset.i,10)];
+      row.sets.splice(parseInt(b.dataset.j,10), 1);
+      if(row.sets.length===0) row.sets.push(emptySet());
+      state.entryRows = rows;
+      render();
+    };
+  });
+
   const btnCopyPrompt = document.getElementById('btnCopyPrompt');
   if(btnCopyPrompt) btnCopyPrompt.onclick = async ()=>{
     state.entryRows = collectEntryRows();
@@ -710,15 +788,21 @@ ${gymEquip}
     "category": "Push または Pull または Legs+ のいずれか",
     "focus": "次回トレーニングの部位・テーマ（例: 背中・二頭筋中心）",
     "must_exercises": [
-      {"name": "種目名（必ず上記設備リストにあるもののみ）", "target": "目安（例: 3-4セット×10-15回、22kg前後から開始）", "rest": "セット間のレスト時間（例: 60秒）"}
+      {"name": "種目名（必ず上記設備リストにあるもののみ）", "target": "目安（例: 3-4セット×10-15回、22kg前後から開始）", "rest": "セット間のレスト時間（例: 60秒）", "warmup": {"weight": ウォームアップ推奨重量(数値kg)、不要な種目はnull, "reps": 推奨回数(数値)、不要ならnull}}
     ],
     "optional_exercises": [
-      {"name": "種目名（必ず上記設備リストにあるもののみ）", "target": "目安", "rest": "レスト時間"}
+      {"name": "種目名（必ず上記設備リストにあるもののみ）", "target": "目安", "rest": "レスト時間", "warmup": {"weight": 数値またはnull, "reps": 数値またはnull}}
     ],
     "notes": "怪我への配慮、漸進性、フォームなどに関する補足を1〜2文で。"
   }
 }
-must_exercisesは「絶対にやるべき種目」を必ず4種目、optional_exercisesは「時間があればやる種目」を必ず4種目、合計8種目ちょうどにしてください。それ以上の種目数は提案しないでください。全種目に必ずrest（レスト時間）を明記してください。`;
+must_exercisesは「絶対にやるべき種目」を必ず4種目、optional_exercisesは「時間があればやる種目」を必ず4種目、合計8種目ちょうどにしてください。それ以上の種目数は提案しないでください。全種目に必ずrest（レスト時間）を明記してください。
+
+【ウォームアップについて】
+高重量を扱う種目や、いきなり本番重量に入ると怪我のリスクがある種目（コンパウンド種目・胸/背中/脚の主要種目など）には、warmupにアップセットの推奨重量と回数を入れてください（本番重量の40〜60%程度 × 10〜15回が目安）。軽量の単関節種目やマシンの補助種目などアップが不要な種目は、warmupのweight・repsをnullにしてください。
+
+【評価について】
+今日のトレーニングはセットごとに重量・回数が記録されています。セット間の重量の落ち方（後半で重量や回数が落ちているか）にも触れ、次回の重量設定の参考になるコメントをしてください。`;
 }
 
 function escapeHtml(s){
