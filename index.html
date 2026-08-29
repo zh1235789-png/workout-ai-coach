@@ -91,6 +91,14 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 .preset-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .preset-grid button{padding:11px 0;border-radius:9px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:600;cursor:pointer}
 .set-timer{background:transparent;border:1px solid var(--border);color:var(--sub);border-radius:8px;width:32px;height:34px;font-size:13px;flex-shrink:0;cursor:pointer}
+/* edit form */
+.ed-warm-toggle{background:var(--bg);border:1px solid var(--border);border-radius:7px;height:34px;padding:0;cursor:pointer}
+.ed-warm-toggle.warm{background:var(--warn-bg);border-color:var(--warn)}
+.ed-menu{padding:10px 0;border-bottom:1px dashed var(--border)}
+.ed-menu:last-of-type{border-bottom:none}
+.ed-menu-nums{display:flex;gap:5px;margin-top:6px}
+.ed-menu-nums input{flex:1;min-width:0;padding:8px;font-size:12.5px}
+.ed-menu-nums .ed-m-rest{flex:1.4}
 /* calendar */
 .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .cal-title{font-size:15px;font-weight:700}
@@ -165,7 +173,7 @@ const DEFAULT_EQUIP_2 = `【筋トレマシン(PRECOR製)】ペクトラルフ�
 【有酸素(PRECOR製)】トレッドミル(8台)、クロストレーナー(2台)、リカンベントバイク(2台)、アップライトバイク(2台)
 【その他】ストレッチエリア、体組成計`;
 
-let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null };
+let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null };
 
 function getSessions(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_SESSIONS)||'[]'); }catch(e){ return []; } }
 function saveSessions(list){ localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list)); }
@@ -176,7 +184,7 @@ function getLastGym(){ return localStorage.getItem(LS_KEY_LAST_GYM) || '1'; }
 function switchTab(tab){
   state.tab = tab;
   state.pendingResult = null; state.error = null; state.viewingSession = null; state.cardio = null; state.cardioLogDate = null;
-  state.entryRows = null; state.entryRowsFromMenu = false; state.shareImage = null;
+  state.entryRows = null; state.entryRowsFromMenu = false; state.shareImage = null; state.editDraft = null;
   render();
 }
 
@@ -717,8 +725,162 @@ async function shareSessionImage(s){
   return 'preview';
 }
 
+function renderEditForm(d){
+  const isCardioOnly = d.type === 'cardio';
+  let html = `<div class="card">
+    <h2>✏️ 記録を編集</h2>
+    <div class="field">
+      <label>日付</label>
+      <input type="date" id="editDate" value="${escapeAttr(d.date||'')}">
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label>有酸素運動</label>
+      <div class="seg">`;
+  if(isCardioOnly){
+    html += `<button data-cardio="walk" class="ed-cardio-btn${d.cardio==='walk'?' sel':''}">ウォーキング</button>
+      <button data-cardio="run" class="ed-cardio-btn${d.cardio==='run'?' sel':''}">ランニング</button>`;
+  } else {
+    const cur = d.cardio || 'none';
+    html += `<button data-cardio="none" class="ed-cardio-btn${cur==='none'?' sel':''}">なし</button>
+      <button data-cardio="walk" class="ed-cardio-btn${cur==='walk'?' sel':''}">ウォーキング</button>
+      <button data-cardio="run" class="ed-cardio-btn${cur==='run'?' sel':''}">ランニング</button>`;
+  }
+  html += `</div></div>
+  </div>`;
+
+  if(!isCardioOnly){
+    html += `<div class="card">
+      <h2>🏋️ やった種目</h2>
+      <div class="sub" style="margin-bottom:8px">「アップ」ボタンでウォームアップセットの切替ができます。</div>`;
+    (d.exercises||[]).forEach((ex,i)=>{
+      html += `<div class="entry-row ed-ex" data-i="${i}" data-maxrm="${escapeAttr(ex.maxRM==null?'':ex.maxRM)}">
+        <div class="entry-head">
+          <input type="text" class="entry-name ed-ex-name" placeholder="種目名" value="${escapeAttr(ex.name||'')}">
+          <button class="entry-del ed-ex-del" data-i="${i}" title="種目を削除">✕</button>
+        </div>`;
+      let wi = 0;
+      (ex.sets||[]).forEach((s,j)=>{
+        const label = s.warmup ? 'アップ' : String(++wi);
+        html += `<div class="set-row ed-set" data-i="${i}" data-j="${j}" data-warmup="${s.warmup?'1':'0'}">
+          <button class="set-label ed-warm-toggle${s.warmup?' warm':''}" data-i="${i}" data-j="${j}" title="アップ切替">${label}</button>
+          <input type="number" class="set-weight ed-w" placeholder="kg" inputmode="decimal" value="${escapeAttr(s.weight==null?'':s.weight)}">
+          <span class="entry-x">×</span>
+          <input type="number" class="set-reps ed-r" placeholder="回" inputmode="numeric" value="${escapeAttr(s.reps==null?'':s.reps)}">
+          <button class="set-del ed-set-del" data-i="${i}" data-j="${j}" title="セットを削除">−</button>
+        </div>`;
+      });
+      html += `<button class="set-add ed-set-add" data-i="${i}">＋ セット追加</button>
+      </div>`;
+    });
+    html += `<button class="btn btn-ghost" id="btnEdAddEx" style="margin-top:8px">＋ 種目を追加</button>
+    </div>`;
+
+    html += `<div class="card">
+      <h2>📝 評価</h2>
+      <textarea id="editEval">${escapeHtml(d.evaluation||'')}</textarea>
+    </div>`;
+
+    const nm = d.next_menu || {};
+    html += `<div class="card">
+      <h2>🎯 次回のトレーニングメニュー</h2>
+      <div class="field">
+        <label>テーマ</label>
+        <input type="text" id="editFocus" placeholder="例: 背中・二頭筋中心" value="${escapeAttr(nm.focus||'')}">
+      </div>`;
+    html += renderEditMenuList('must', '🔴 必須', nm.must_exercises||[]);
+    html += renderEditMenuList('opt', '🟡 余裕があれば', nm.optional_exercises||[]);
+    html += `<div class="field" style="margin-top:14px;margin-bottom:0">
+        <label>補足・注意</label>
+        <textarea id="editNotes" style="min-height:60px">${escapeHtml(nm.notes||'')}</textarea>
+      </div>
+    </div>`;
+  }
+
+  html += `<div class="card">`;
+  if(state.error){ html += `<div class="err-box">${escapeHtml(state.error)}</div>`; }
+  html += `<button class="btn btn-primary" id="btnEditSave">変更を保存</button>
+    <button class="btn btn-ghost" id="btnEditCancel">キャンセル</button>
+  </div>`;
+  return html;
+}
+
+function renderEditMenuList(kind, label, list){
+  let html = `<div class="menu-group-label">${label}</div>`;
+  list.forEach((ex,i)=>{
+    const w = ex.warmup || {};
+    html += `<div class="ed-menu" data-kind="${kind}" data-i="${i}">
+      <div class="entry-head">
+        <input type="text" class="ed-m-name" placeholder="種目名" value="${escapeAttr(ex.name||'')}">
+        <button class="entry-del ed-menu-del" data-kind="${kind}" data-i="${i}" title="削除">✕</button>
+      </div>
+      <input type="text" class="ed-m-target" placeholder="目安（例: 3セット×10回）" value="${escapeAttr(ex.target||'')}" style="margin-top:6px">
+      <div class="ed-menu-nums">
+        <input type="text" class="ed-m-rest" placeholder="レスト（例: 60秒）" value="${escapeAttr(ex.rest||'')}">
+        <input type="number" class="ed-m-wkg" placeholder="アップkg" inputmode="decimal" value="${escapeAttr(w.weight==null?'':w.weight)}">
+        <input type="number" class="ed-m-wrep" placeholder="アップ回" inputmode="numeric" value="${escapeAttr(w.reps==null?'':w.reps)}">
+      </div>
+    </div>`;
+  });
+  html += `<button class="set-add ed-menu-add" data-kind="${kind}">＋ 種目を追加</button>`;
+  return html;
+}
+
+function numOrNull(v){
+  const t = String(v==null?'':v).trim();
+  if(t === '') return null;
+  const n = Number(t);
+  return isNaN(n) ? null : n;
+}
+
+function collectEditDraft(){
+  const d = JSON.parse(JSON.stringify(state.editDraft));
+  const dateEl = document.getElementById('editDate');
+  if(dateEl && dateEl.value) d.date = dateEl.value;
+  if(d.type === 'cardio') return d;
+
+  d.exercises = [...document.querySelectorAll('.ed-ex')].map(el=>({
+    name: el.querySelector('.ed-ex-name').value,
+    maxRM: numOrNull(el.dataset.maxrm),
+    sets: [...el.querySelectorAll('.ed-set')].map(sEl=>({
+      weight: numOrNull(sEl.querySelector('.ed-w').value),
+      reps: numOrNull(sEl.querySelector('.ed-r').value),
+      warmup: sEl.dataset.warmup === '1'
+    }))
+  }));
+
+  const ev = document.getElementById('editEval');
+  if(ev) d.evaluation = ev.value;
+
+  const focusEl = document.getElementById('editFocus');
+  if(focusEl){
+    const nm = d.next_menu || {};
+    nm.focus = focusEl.value;
+    nm.notes = document.getElementById('editNotes').value;
+    nm.must_exercises = collectEditMenuList('must');
+    nm.optional_exercises = collectEditMenuList('opt');
+    d.next_menu = nm;
+  }
+  return d;
+}
+
+function collectEditMenuList(kind){
+  return [...document.querySelectorAll(`.ed-menu[data-kind="${kind}"]`)].map(el=>{
+    const wkg = numOrNull(el.querySelector('.ed-m-wkg').value);
+    const wrep = numOrNull(el.querySelector('.ed-m-wrep').value);
+    return {
+      name: el.querySelector('.ed-m-name').value,
+      target: el.querySelector('.ed-m-target').value,
+      rest: el.querySelector('.ed-m-rest').value,
+      warmup: { weight: wkg, reps: wrep }
+    };
+  }).filter(e=>e.name.trim());
+}
+
 function renderHistory(){
   const sessions = getSessions();
+  if(state.editDraft){
+    return renderEditForm(state.editDraft);
+  }
   if(state.viewingSession){
     const s = state.viewingSession;
     let html = `<div class="card"><span class="detail-close" id="btnCloseDetail">閉じる ✕</span><div style="clear:both"></div></div>`;
@@ -728,7 +890,10 @@ function renderHistory(){
     } else {
       html += renderResult(s, false);
     }
-    html += `<div class="card"><button class="btn btn-ghost" id="btnDeleteSession">この記録を削除</button></div>`;
+    html += `<div class="card">
+      <button class="btn btn-secondary" id="btnEditSession">✏️ この記録を編集</button>
+      <button class="btn btn-ghost" id="btnDeleteSession">この記録を削除</button>
+    </div>`;
     return html;
   }
   if(sessions.length===0){
@@ -1068,7 +1233,121 @@ function bindEvents(){
   };
 
   const btnCloseDetail = document.getElementById('btnCloseDetail');
-  if(btnCloseDetail) btnCloseDetail.onclick = ()=>{ state.viewingSession=null; render(); };
+  if(btnCloseDetail) btnCloseDetail.onclick = ()=>{ state.viewingSession=null; state.editDraft=null; state.shareImage=null; render(); };
+
+  const btnEditSession = document.getElementById('btnEditSession');
+  if(btnEditSession) btnEditSession.onclick = ()=>{
+    state.editDraft = JSON.parse(JSON.stringify(state.viewingSession));
+    state.error = null;
+    render();
+  };
+
+  document.querySelectorAll('.ed-cardio-btn').forEach(b=>{
+    b.onclick = ()=>{
+      const d = collectEditDraft();
+      d.cardio = b.dataset.cardio;
+      state.editDraft = d;
+      render();
+    };
+  });
+
+  document.querySelectorAll('.ed-warm-toggle').forEach(b=>{
+    b.onclick = ()=>{
+      const d = collectEditDraft();
+      const set = d.exercises[+b.dataset.i].sets[+b.dataset.j];
+      set.warmup = !set.warmup;
+      state.editDraft = d;
+      render();
+    };
+  });
+
+  document.querySelectorAll('.ed-set-add').forEach(b=>{
+    b.onclick = ()=>{
+      const d = collectEditDraft();
+      d.exercises[+b.dataset.i].sets.push({ weight:null, reps:null, warmup:false });
+      state.editDraft = d;
+      render();
+    };
+  });
+
+  document.querySelectorAll('.ed-set-del').forEach(b=>{
+    b.onclick = ()=>{
+      const d = collectEditDraft();
+      const ex = d.exercises[+b.dataset.i];
+      ex.sets.splice(+b.dataset.j, 1);
+      if(ex.sets.length === 0) ex.sets.push({ weight:null, reps:null, warmup:false });
+      state.editDraft = d;
+      render();
+    };
+  });
+
+  document.querySelectorAll('.ed-ex-del').forEach(b=>{
+    b.onclick = ()=>{
+      const d = collectEditDraft();
+      d.exercises.splice(+b.dataset.i, 1);
+      state.editDraft = d;
+      render();
+    };
+  });
+
+  const btnEdAddEx = document.getElementById('btnEdAddEx');
+  if(btnEdAddEx) btnEdAddEx.onclick = ()=>{
+    const d = collectEditDraft();
+    d.exercises.push({ name:'', maxRM:null, sets:[{ weight:null, reps:null, warmup:false }] });
+    state.editDraft = d;
+    render();
+  };
+
+  document.querySelectorAll('.ed-menu-add').forEach(b=>{
+    b.onclick = ()=>{
+      const d = collectEditDraft();
+      const key = b.dataset.kind === 'must' ? 'must_exercises' : 'optional_exercises';
+      d.next_menu = d.next_menu || {};
+      d.next_menu[key] = d.next_menu[key] || [];
+      d.next_menu[key].push({ name:'', target:'', rest:'', warmup:{ weight:null, reps:null } });
+      state.editDraft = d;
+      render();
+    };
+  });
+
+  document.querySelectorAll('.ed-menu-del').forEach(b=>{
+    b.onclick = ()=>{
+      const d = collectEditDraft();
+      const key = b.dataset.kind === 'must' ? 'must_exercises' : 'optional_exercises';
+      d.next_menu[key].splice(+b.dataset.i, 1);
+      state.editDraft = d;
+      render();
+    };
+  });
+
+  const btnEditCancel = document.getElementById('btnEditCancel');
+  if(btnEditCancel) btnEditCancel.onclick = ()=>{
+    state.editDraft = null; state.error = null;
+    render();
+  };
+
+  const btnEditSave = document.getElementById('btnEditSave');
+  if(btnEditSave) btnEditSave.onclick = ()=>{
+    try{
+      const updated = collectEditDraft();
+      if(updated.type !== 'cardio'){
+        updated.exercises = (updated.exercises||[]).filter(ex=>ex.name.trim());
+      }
+      const sessions = getSessions();
+      const idx = sessions.findIndex(x=>x.id === updated.id);
+      if(idx === -1) throw new Error('元の記録が見つかりませんでした');
+      sessions[idx] = updated;
+      saveSessions(sessions);
+      state.editDraft = null;
+      state.viewingSession = updated;
+      state.shareImage = null;
+      state.error = null;
+      render();
+    }catch(err){
+      state.error = '保存に失敗しました: ' + err.message;
+      render();
+    }
+  };
 
   const btnDeleteSession = document.getElementById('btnDeleteSession');
   if(btnDeleteSession) btnDeleteSession.onclick = ()=>{
