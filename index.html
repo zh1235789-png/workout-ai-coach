@@ -73,8 +73,11 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 .entry-del{background:transparent;border:1px solid var(--border);color:var(--sub);border-radius:8px;width:34px;height:38px;font-size:13px;flex-shrink:0;cursor:pointer}
 .set-row{display:flex;align-items:center;gap:5px;margin-top:6px}
 .set-row input{padding:8px;font-size:13px;text-align:center;min-width:0;flex:1}
-.set-label{width:38px;flex-shrink:0;font-size:11.5px;font-weight:700;color:var(--sub);text-align:center}
+.set-label{width:40px;flex-shrink:0;font-size:11.5px;font-weight:700;color:var(--sub);text-align:center}
 .set-label.warm{color:var(--warn);font-size:10.5px}
+/* セット番号をタップするとアップ切替になるボタン */
+.warm-toggle,.ed-warm-toggle{background:var(--bg);border:1px solid var(--border);border-radius:7px;height:34px;padding:0;cursor:pointer}
+.warm-toggle.warm,.ed-warm-toggle.warm{background:var(--warn-bg);border-color:var(--warn)}
 .entry-x{color:var(--sub);font-size:12px}
 .set-del{background:transparent;border:1px solid var(--border);color:var(--sub);border-radius:8px;width:30px;height:34px;font-size:15px;flex-shrink:0;cursor:pointer;line-height:1}
 .set-add{background:transparent;border:1px dashed var(--border);color:var(--sub);border-radius:8px;padding:6px 0;width:100%;font-size:12px;margin-top:7px;cursor:pointer}
@@ -104,8 +107,6 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 .preset-grid button{padding:11px 0;border-radius:9px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:600;cursor:pointer}
 .set-timer{background:transparent;border:1px solid var(--border);color:var(--sub);border-radius:8px;width:32px;height:34px;font-size:13px;flex-shrink:0;cursor:pointer}
 /* edit form */
-.ed-warm-toggle{background:var(--bg);border:1px solid var(--border);border-radius:7px;height:34px;padding:0;cursor:pointer}
-.ed-warm-toggle.warm{background:var(--warn-bg);border-color:var(--warn)}
 .ed-menu{padding:10px 0;border-bottom:1px dashed var(--border)}
 .ed-menu:last-of-type{border-bottom:none}
 .ed-menu-nums{display:flex;gap:5px;margin-top:6px}
@@ -362,7 +363,7 @@ function renderHome(){
   if(state.entryRows===null || state.entryRows===undefined) state.entryRows = buildInitialEntryRows();
   html += `<div class="card">
     <h2>🏋️ 今日やった筋トレ</h2>
-    <div class="sub" style="margin-bottom:10px">${state.entryRowsFromMenu ? '前回提案したメニューを読み込みました。やった種目に重量・回数を入れてください（空欄の種目は「やらなかった」扱いになります）。' : '種目・重量・回数を入力してください。'}</div>
+    <div class="sub" style="margin-bottom:10px">${state.entryRowsFromMenu ? '前回提案したメニューを読み込みました。やった種目に重量・回数を入れてください（空欄の種目は「やらなかった」扱いになります）。' : '種目・重量・回数を入力してください。'}<br>左端のセット番号をタップすると「アップ」に切り替わります。</div>
     <div id="entryRows">`;
   state.entryRows.forEach((r,i)=>{
     html += `<div class="entry-row" data-i="${i}" data-hint="${escapeAttr(r.hint||'')}" data-warmup-hint="${escapeAttr(r.warmupHint||'')}" data-rest-sec="${escapeAttr(r.restSec||'')}">
@@ -375,7 +376,7 @@ function renderHome(){
     (r.sets||[]).forEach((s,j)=>{
       const label = s.warmup ? 'アップ' : String(++workIdx);
       html += `<div class="set-row" data-i="${i}" data-j="${j}" data-warmup="${s.warmup?'1':'0'}">
-        <span class="set-label${s.warmup?' warm':''}">${label}</span>
+        <button class="set-label warm-toggle${s.warmup?' warm':''}" data-i="${i}" data-j="${j}" title="ウォームアップ切替">${label}</button>
         <input type="number" class="set-weight" placeholder="kg" inputmode="decimal" value="${escapeAttr(s.weight)}">
         <span class="entry-x">×</span>
         <input type="number" class="set-reps" placeholder="回" inputmode="numeric" value="${escapeAttr(s.reps)}">
@@ -1293,6 +1294,16 @@ function bindEvents(){
       const row = b.closest('.entry-row');
       const sec = parseInt(row && row.dataset.restSec, 10);
       startTimer(sec > 0 ? sec : 60);
+    };
+  });
+
+  document.querySelectorAll('.warm-toggle').forEach(b=>{
+    b.onclick = ()=>{
+      const rows = collectEntryRows();
+      const set = rows[+b.dataset.i].sets[+b.dataset.j];
+      set.warmup = !set.warmup;
+      state.entryRows = rows;
+      render();
     };
   });
 
