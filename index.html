@@ -24,6 +24,8 @@
   }
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* iOS Safariの既定ボタン描画を打ち消す（文字色・フォントが上書きされるのを防ぐ） */
+button{-webkit-appearance:none;appearance:none;font-family:inherit;color:inherit;background:none;border:none}
 body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;background:var(--bg);color:var(--text);padding-bottom:calc(72px + env(safe-area-inset-bottom))}
 body.timer-on{padding-bottom:calc(140px + env(safe-area-inset-bottom))}
 header{background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;padding:calc(14px + env(safe-area-inset-top)) 16px 14px;position:sticky;top:0;z-index:10}
