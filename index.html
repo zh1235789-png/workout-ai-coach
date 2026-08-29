@@ -78,6 +78,7 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 .set-del{background:transparent;border:1px solid var(--border);color:var(--sub);border-radius:8px;width:30px;height:34px;font-size:15px;flex-shrink:0;cursor:pointer;line-height:1}
 .set-add{background:transparent;border:1px dashed var(--border);color:var(--sub);border-radius:8px;padding:6px 0;width:100%;font-size:12px;margin-top:7px;cursor:pointer}
 .warm-hint{font-size:11px;color:var(--warn);margin:3px 0 0 43px}
+.share-preview{width:100%;border-radius:10px;border:1px solid var(--border);margin-top:12px;display:block}
 /* calendar */
 .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .cal-title{font-size:15px;font-weight:700}
@@ -145,7 +146,7 @@ const DEFAULT_EQUIP_2 = `【筋トレマシン(PRECOR製)】ペクトラルフ�
 【有酸素(PRECOR製)】トレッドミル(8台)、クロストレーナー(2台)、リカンベントバイク(2台)、アップライトバイク(2台)
 【その他】ストレッチエリア、体組成計`;
 
-let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false };
+let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null };
 
 function getSessions(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_SESSIONS)||'[]'); }catch(e){ return []; } }
 function saveSessions(list){ localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list)); }
@@ -156,7 +157,7 @@ function getLastGym(){ return localStorage.getItem(LS_KEY_LAST_GYM) || '1'; }
 function switchTab(tab){
   state.tab = tab;
   state.pendingResult = null; state.error = null; state.viewingSession = null; state.cardio = null; state.cardioLogDate = null;
-  state.entryRows = null; state.entryRowsFromMenu = false;
+  state.entryRows = null; state.entryRowsFromMenu = false; state.shareImage = null;
   render();
 }
 
@@ -351,10 +352,16 @@ function renderResult(result, isPending){
   (result.exercises||[]).forEach(ex=>{
     html += `<div class="ex-row"><div class="ex-name">${escapeHtml(ex.name)}${ex.maxRM?`<span class="ex-max">MAX 1RM ${ex.maxRM}kg</span>`:''}</div>`;
     html += `<div class="ex-sets">`;
-    (ex.sets||[]).forEach((s,i)=>{ html += `${i+1}) ${s.weight}kg × ${s.reps}reps　`; });
+    let wi = 0;
+    (ex.sets||[]).forEach(s=>{
+      const label = s.warmup ? 'アップ' : String(++wi);
+      html += `${label}) ${setWeightLabel(s)}${s.reps!=null?` × ${s.reps}回`:''}　`;
+    });
     html += `</div></div>`;
   });
   html += `</div>`;
+
+  html += renderShareCard();
 
   html += `<div class="card"><h2>📝 評価</h2><div class="eval-box">${escapeHtml(result.evaluation||'')}</div></div>`;
 
@@ -389,6 +396,157 @@ function renderResult(result, isPending){
   return html;
 }
 
+function setWeightLabel(s){
+  if(s.weight==null || s.weight==='') return '自重';
+  return `${s.weight}kg`;
+}
+
+function renderShareCard(){
+  let html = `<div class="card">
+    <h2>📤 記録を共有</h2>
+    <div class="sub" style="margin-bottom:10px">LINEなどで友達に共有できます。</div>
+    <button class="btn btn-primary" id="btnShareImg">画像で共有</button>
+    <button class="btn btn-ghost" id="btnShareText">テキストをコピー</button>
+    <div id="shareMsg" class="center-msg" style="display:none;color:var(--ok)"></div>`;
+  if(state.shareImage){
+    html += `<img src="${state.shareImage}" class="share-preview">
+      <div class="sub" style="margin-top:6px;text-align:center">画像を長押しして「写真に保存」または「コピー」できます</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function shareTargetSession(){
+  return state.pendingResult || state.viewingSession;
+}
+
+function buildShareText(s){
+  if(!s) return '';
+  let out = `🏋️ ${s.date||''} のトレーニング\n`;
+  if(s.type==='cardio'){
+    out += `\n${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}\n`;
+    return out;
+  }
+  if(s.cardio && s.cardio!=='none'){
+    out += `${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}あり\n`;
+  }
+  (s.exercises||[]).forEach(ex=>{
+    out += `\n■ ${ex.name}\n`;
+    let wi = 0;
+    (ex.sets||[]).forEach(set=>{
+      const label = set.warmup ? 'アップ' : String(++wi);
+      out += `  ${label}. ${setWeightLabel(set)}${set.reps!=null?` × ${set.reps}回`:''}\n`;
+    });
+  });
+  if(s.next_menu && s.next_menu.focus){
+    out += `\n次回: ${s.next_menu.focus}\n`;
+  }
+  return out;
+}
+
+function drawShareImage(s){
+  const SC = 2, W = 640, PAD = 34;
+  const rows = [];
+  if(s.type==='cardio'){
+    rows.push({t:'ex', text: s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'});
+  } else {
+    (s.exercises||[]).forEach(ex=>{
+      rows.push({t:'ex', text: ex.name});
+      let wi = 0;
+      (ex.sets||[]).forEach(set=>{
+        const label = set.warmup ? 'アップ' : String(++wi);
+        rows.push({t:'set', label, text: `${setWeightLabel(set)}${set.reps!=null?` × ${set.reps}回`:''}`});
+      });
+    });
+  }
+  const headerH = 108;
+  const cardioH = (s.type!=='cardio' && s.cardio && s.cardio!=='none') ? 38 : 0;
+  let bodyH = 12;
+  rows.forEach(r=>{ bodyH += (r.t==='ex' ? 44 : 32); });
+  const nextH = (s.next_menu && s.next_menu.focus) ? 56 : 0;
+  const footerH = 52;
+  const H = headerH + cardioH + bodyH + nextH + footerH + PAD;
+
+  const c = document.createElement('canvas');
+  c.width = W*SC; c.height = H*SC;
+  const ctx = c.getContext('2d');
+  ctx.scale(SC, SC);
+  const FONT = '-apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif';
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  const grad = ctx.createLinearGradient(0, 0, W, headerH);
+  grad.addColorStop(0, '#f97316');
+  grad.addColorStop(1, '#ea580c');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, headerH);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `700 30px ${FONT}`;
+  ctx.fillText('💪 今日のトレーニング', PAD, 48);
+  ctx.font = `400 21px ${FONT}`;
+  ctx.fillStyle = 'rgba(255,255,255,.92)';
+  ctx.fillText(s.date || '', PAD, 82);
+
+  let y = headerH + 32;
+  if(cardioH){
+    ctx.fillStyle = '#6b7a89';
+    ctx.font = `400 20px ${FONT}`;
+    ctx.fillText(`${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}あり`, PAD, y);
+    y += cardioH;
+  }
+  y += 6;
+  rows.forEach(r=>{
+    if(r.t==='ex'){
+      ctx.fillStyle = '#1a2530';
+      ctx.font = `700 24px ${FONT}`;
+      ctx.fillText(r.text, PAD, y);
+      y += 44;
+    } else {
+      ctx.fillStyle = r.label==='アップ' ? '#b45309' : '#9aa7b3';
+      ctx.font = `700 17px ${FONT}`;
+      ctx.fillText(r.label, PAD + 14, y - 4);
+      ctx.fillStyle = '#3d4c5a';
+      ctx.font = `400 20px ${FONT}`;
+      ctx.fillText(r.text, PAD + 80, y - 4);
+      y += 32;
+    }
+  });
+
+  if(nextH){
+    y += 6;
+    ctx.strokeStyle = '#e3e8ee';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD, y-12); ctx.lineTo(W-PAD, y-12); ctx.stroke();
+    ctx.fillStyle = '#f97316';
+    ctx.font = `700 20px ${FONT}`;
+    ctx.fillText(`次回: ${s.next_menu.focus}`, PAD, y + 20);
+    y += nextH;
+  }
+
+  ctx.fillStyle = '#b3bdc7';
+  ctx.font = `400 16px ${FONT}`;
+  ctx.fillText('筋トレAIコーチ', PAD, H - 24);
+  return c;
+}
+
+async function shareSessionImage(s){
+  const canvas = drawShareImage(s);
+  const blob = await new Promise(res=>canvas.toBlob(res, 'image/png'));
+  const file = new File([blob], `workout-${s.date||'record'}.png`, { type:'image/png' });
+  if(navigator.canShare && navigator.canShare({ files:[file] })){
+    try{
+      await navigator.share({ files:[file] });
+      return 'shared';
+    }catch(err){
+      if(err && err.name === 'AbortError') return 'aborted';
+    }
+  }
+  state.shareImage = canvas.toDataURL('image/png');
+  render();
+  return 'preview';
+}
+
 function renderHistory(){
   const sessions = getSessions();
   if(state.viewingSession){
@@ -396,6 +554,7 @@ function renderHistory(){
     let html = `<div class="card"><span class="detail-close" id="btnCloseDetail">閉じる ✕</span><div style="clear:both"></div></div>`;
     if(s.type==='cardio'){
       html += `<div class="card"><h2>${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}</h2><div class="sub">${escapeHtml(s.date||'')}（筋トレなし・有酸素のみの記録）</div></div>`;
+      html += renderShareCard();
     } else {
       html += renderResult(s, false);
     }
@@ -679,6 +838,7 @@ function bindEvents(){
     el.onclick = ()=>{
       const sessions = getSessions();
       state.viewingSession = sessions.find(s=>s.id===el.dataset.id);
+      state.shareImage = null;
       render();
     };
   });
@@ -692,9 +852,39 @@ function bindEvents(){
     el.onclick = ()=>{
       const sessions = getSessions();
       state.viewingSession = sessions.find(s=>s.id===el.dataset.id);
+      state.shareImage = null;
       render();
     };
   });
+  const btnShareImg = document.getElementById('btnShareImg');
+  if(btnShareImg) btnShareImg.onclick = async ()=>{
+    const s = shareTargetSession();
+    if(!s) return;
+    const msg = document.getElementById('shareMsg');
+    try{
+      const res = await shareSessionImage(s);
+      if(res === 'shared'){
+        const m = document.getElementById('shareMsg');
+        if(m){ m.textContent = '✓ 共有しました'; m.style.display = 'block';
+          setTimeout(()=>{ m.style.display='none'; }, 1800); }
+      }
+    }catch(err){
+      if(msg){ msg.textContent = '画像の生成に失敗しました: ' + err.message;
+        msg.style.color = 'var(--danger)'; msg.style.display = 'block'; }
+    }
+  };
+
+  const btnShareText = document.getElementById('btnShareText');
+  if(btnShareText) btnShareText.onclick = async ()=>{
+    const s = shareTargetSession();
+    if(!s) return;
+    await copyToClipboard(buildShareText(s));
+    const msg = document.getElementById('shareMsg');
+    msg.textContent = '✓ テキストをコピーしました';
+    msg.style.display = 'block';
+    setTimeout(()=>{ msg.style.display='none'; }, 1800);
+  };
+
   const btnCloseDetail = document.getElementById('btnCloseDetail');
   if(btnCloseDetail) btnCloseDetail.onclick = ()=>{ state.viewingSession=null; render(); };
 
@@ -780,7 +970,7 @@ ${gymEquip}
 {
   "date": "${workoutText ? todayStr() : '画像内の日付(YYYY-MM-DD)。読み取れない場合は今日の日付'}",
   "exercises": [
-    {"name": "種目名", "sets": [{"weight": 数値kg, "reps": 数値}], "maxRM": その種目の最大推定1RM(数値、なければnull)}
+    {"name": "種目名", "sets": [{"weight": 数値kg(自重の場合はnull), "reps": 数値, "warmup": ウォームアップセットならtrue、通常セットはfalse}], "maxRM": その種目の最大推定1RM(数値、なければnull)}
   ],
   "evaluation": "このセッションの評価。前回までの履歴と比較した進捗、頑張った点、フォームや強度に関する注意点などを2〜4文で。日本語。",
   "next_menu": {
