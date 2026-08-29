@@ -25,6 +25,7 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;background:var(--bg);color:var(--text);padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+body.timer-on{padding-bottom:calc(140px + env(safe-area-inset-bottom))}
 header{background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;padding:calc(14px + env(safe-area-inset-top)) 16px 14px;position:sticky;top:0;z-index:10}
 header h1{font-size:17px;font-weight:700}
 header .sub{color:rgba(255,255,255,.85);font-size:12px;margin-top:2px}
@@ -79,6 +80,17 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 .set-add{background:transparent;border:1px dashed var(--border);color:var(--sub);border-radius:8px;padding:6px 0;width:100%;font-size:12px;margin-top:7px;cursor:pointer}
 .warm-hint{font-size:11px;color:var(--warn);margin:3px 0 0 43px}
 .share-preview{width:100%;border-radius:10px;border:1px solid var(--border);margin-top:12px;display:block}
+/* rest timer */
+.timer-bar{position:fixed;left:12px;right:12px;bottom:calc(66px + env(safe-area-inset-bottom));max-width:536px;margin:0 auto;background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:0 6px 22px rgba(0,0,0,.22);display:flex;align-items:center;gap:7px;padding:10px 12px;z-index:30;overflow:hidden}
+.timer-time{font-size:25px;font-weight:700;flex:1;font-variant-numeric:tabular-nums;letter-spacing:.5px}
+.timer-bar.done{border-color:var(--ok)}
+.timer-bar.done .timer-time{color:var(--ok)}
+.timer-btn{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:8px 10px;font-size:12.5px;font-weight:600;cursor:pointer;flex-shrink:0}
+.timer-progress{position:absolute;left:0;bottom:0;height:3px;width:100%;background:var(--accent)}
+.timer-bar.done .timer-progress{background:var(--ok)}
+.preset-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.preset-grid button{padding:11px 0;border-radius:9px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:600;cursor:pointer}
+.set-timer{background:transparent;border:1px solid var(--border);color:var(--sub);border-radius:8px;width:32px;height:34px;font-size:13px;flex-shrink:0;cursor:pointer}
 /* calendar */
 .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .cal-title{font-size:15px;font-weight:700}
@@ -121,6 +133,13 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
   <div class="sub" id="headerSub">Claudeチャットと連携して評価&次回メニューを記録</div>
 </header>
 <main id="app"></main>
+<div id="timerBar" class="timer-bar" style="display:none">
+  <div class="timer-time" id="timerTime">0:00</div>
+  <button class="timer-btn" id="timerAdd">+30秒</button>
+  <button class="timer-btn" id="timerToggle">一時停止</button>
+  <button class="timer-btn" id="timerStop">✕</button>
+  <div class="timer-progress" id="timerProgress"></div>
+</div>
 <nav class="tabbar">
   <button data-tab="home" class="tab-btn"><span class="ic">📝</span>記録</button>
   <button data-tab="history" class="tab-btn"><span class="ic">📋</span>履歴</button>
@@ -192,7 +211,7 @@ function buildInitialEntryRows(){
     }
     const n = countTargetSets(e.target);
     for(let i=0;i<n;i++) sets.push(emptySet());
-    return { name: e.name, sets, hint: e.target||'', warmupHint: warm ? formatWarmupHint(warm) : '' };
+    return { name: e.name, sets, hint: e.target||'', warmupHint: warm ? formatWarmupHint(warm) : '', restSec: parseRestSeconds(e.rest) || '' };
   });
 }
 
@@ -225,7 +244,8 @@ function collectEntryRows(){
       name: el.querySelector('.entry-name').value,
       sets,
       hint: el.dataset.hint || '',
-      warmupHint: el.dataset.warmupHint || ''
+      warmupHint: el.dataset.warmupHint || '',
+      restSec: el.dataset.restSec || ''
     });
   });
   return rows;
@@ -289,13 +309,28 @@ function renderHome(){
     <div id="cardioLogSaved" class="center-msg" style="display:none;color:var(--ok)">✓ 記録しました</div>
   </div>`;
 
+  html += `<div class="card">
+    <h2>⏱ インターバルタイマー</h2>
+    <div class="sub" style="margin-bottom:10px">タップで開始。終了時に音とバイブでお知らせします。各セットの「⏱」からも開始できます。</div>
+    <div class="preset-grid">
+      <button class="preset-btn" data-sec="30">30秒</button>
+      <button class="preset-btn" data-sec="45">45秒</button>
+      <button class="preset-btn" data-sec="60">60秒</button>
+      <button class="preset-btn" data-sec="90">90秒</button>
+      <button class="preset-btn" data-sec="120">2分</button>
+      <button class="preset-btn" data-sec="150">2分30</button>
+      <button class="preset-btn" data-sec="180">3分</button>
+      <button class="preset-btn" data-sec="240">4分</button>
+    </div>
+  </div>`;
+
   if(state.entryRows===null || state.entryRows===undefined) state.entryRows = buildInitialEntryRows();
   html += `<div class="card">
     <h2>🏋️ 今日やった筋トレ</h2>
     <div class="sub" style="margin-bottom:10px">${state.entryRowsFromMenu ? '前回提案したメニューを読み込みました。やった種目に重量・回数を入れてください（空欄の種目は「やらなかった」扱いになります）。' : '種目・重量・回数を入力してください。'}</div>
     <div id="entryRows">`;
   state.entryRows.forEach((r,i)=>{
-    html += `<div class="entry-row" data-i="${i}" data-hint="${escapeAttr(r.hint||'')}" data-warmup-hint="${escapeAttr(r.warmupHint||'')}">
+    html += `<div class="entry-row" data-i="${i}" data-hint="${escapeAttr(r.hint||'')}" data-warmup-hint="${escapeAttr(r.warmupHint||'')}" data-rest-sec="${escapeAttr(r.restSec||'')}">
       <div class="entry-head">
         <input type="text" class="entry-name" data-i="${i}" placeholder="種目名" value="${escapeAttr(r.name)}">
         <button class="entry-del" data-i="${i}" title="種目を削除">✕</button>
@@ -309,6 +344,7 @@ function renderHome(){
         <input type="number" class="set-weight" placeholder="kg" inputmode="decimal" value="${escapeAttr(s.weight)}">
         <span class="entry-x">×</span>
         <input type="number" class="set-reps" placeholder="回" inputmode="numeric" value="${escapeAttr(s.reps)}">
+        <button class="set-timer" data-i="${i}" title="このセット後のインターバル開始">⏱</button>
         <button class="set-del" data-i="${i}" data-j="${j}" title="セットを削除">−</button>
       </div>`;
       if(s.warmup && r.warmupHint){
@@ -394,6 +430,140 @@ function renderResult(result, isPending){
       <button class="btn btn-ghost" id="btnDiscard">破棄してやり直す</button></div>`;
   }
   return html;
+}
+
+/* ===== インターバルタイマー ===== */
+const timer = { total:0, remaining:0, endsAt:0, running:false, tick:null, wakeLock:null, audio:null };
+
+function parseRestSeconds(rest){
+  if(!rest) return null;
+  const str = String(rest);
+  const m = str.match(/(\d+)/);
+  if(!m) return null;
+  let n = parseInt(m[1], 10);
+  if(/分/.test(str) && n <= 10) n = n * 60;
+  return (n > 0 && n <= 600) ? n : null;
+}
+
+function fmtTime(sec){
+  const s = Math.max(0, Math.ceil(sec));
+  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+}
+
+function ensureAudio(){
+  try{
+    if(!timer.audio) timer.audio = new (window.AudioContext || window.webkitAudioContext)();
+    if(timer.audio.state === 'suspended') timer.audio.resume();
+  }catch(e){ /* 音が出せない環境は無音で続行 */ }
+}
+
+function beep(){
+  try{
+    if(!timer.audio) return;
+    const ctx = timer.audio;
+    [0, 0.28, 0.56].forEach(offset=>{
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + offset);
+      gain.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + offset + 0.20);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + offset);
+      osc.stop(ctx.currentTime + offset + 0.22);
+    });
+  }catch(e){ /* noop */ }
+}
+
+async function requestWakeLock(){
+  try{
+    if('wakeLock' in navigator && !timer.wakeLock){
+      timer.wakeLock = await navigator.wakeLock.request('screen');
+      timer.wakeLock.addEventListener('release', ()=>{ timer.wakeLock = null; });
+    }
+  }catch(e){ /* 未対応環境は無視 */ }
+}
+
+function releaseWakeLock(){
+  try{ if(timer.wakeLock){ timer.wakeLock.release(); timer.wakeLock = null; } }catch(e){}
+}
+
+function startTimer(sec){
+  if(!sec || sec <= 0) return;
+  ensureAudio();
+  requestWakeLock();
+  timer.total = sec;
+  timer.remaining = sec;
+  timer.endsAt = Date.now() + sec*1000;
+  timer.running = true;
+  if(timer.tick) clearInterval(timer.tick);
+  timer.tick = setInterval(tickTimer, 200);
+  paintTimer();
+}
+
+function tickTimer(){
+  if(!timer.running) return;
+  const prev = timer.remaining;
+  timer.remaining = (timer.endsAt - Date.now()) / 1000;
+  if(prev > 0 && timer.remaining <= 0){
+    timer.remaining = 0;
+    timer.running = false;
+    clearInterval(timer.tick); timer.tick = null;
+    releaseWakeLock();
+    beep();
+    if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  }
+  paintTimer();
+}
+
+function toggleTimer(){
+  if(timer.remaining <= 0) return;
+  if(timer.running){
+    timer.running = false;
+    if(timer.tick){ clearInterval(timer.tick); timer.tick = null; }
+    releaseWakeLock();
+  } else {
+    timer.endsAt = Date.now() + timer.remaining*1000;
+    timer.running = true;
+    requestWakeLock();
+    timer.tick = setInterval(tickTimer, 200);
+  }
+  paintTimer();
+}
+
+function addTimer(sec){
+  if(timer.total === 0) return;
+  timer.total += sec;
+  timer.remaining += sec;
+  if(timer.running) timer.endsAt += sec*1000;
+  else if(timer.remaining > 0){ /* 一時停止のまま延長 */ }
+  paintTimer();
+}
+
+function stopTimer(){
+  timer.running = false; timer.remaining = 0; timer.total = 0;
+  if(timer.tick){ clearInterval(timer.tick); timer.tick = null; }
+  releaseWakeLock();
+  paintTimer();
+}
+
+function paintTimer(){
+  const bar = document.getElementById('timerBar');
+  if(!bar) return;
+  if(timer.total === 0){
+    bar.style.display = 'none';
+    document.body.classList.remove('timer-on');
+    return;
+  }
+  bar.style.display = 'flex';
+  document.body.classList.add('timer-on');
+  const done = timer.remaining <= 0;
+  bar.classList.toggle('done', done);
+  document.getElementById('timerTime').textContent = done ? '⏰ 終了' : fmtTime(timer.remaining);
+  document.getElementById('timerToggle').textContent = done ? '再開' : (timer.running ? '一時停止' : '再開');
+  document.getElementById('timerToggle').style.display = done ? 'none' : '';
+  document.getElementById('timerProgress').style.width =
+    (done ? 100 : Math.min(100, (1 - timer.remaining/timer.total) * 100)) + '%';
 }
 
 function setWeightLabel(s){
@@ -749,6 +919,18 @@ function bindEvents(){
     };
   });
 
+  document.querySelectorAll('.preset-btn').forEach(b=>{
+    b.onclick = ()=> startTimer(parseInt(b.dataset.sec, 10));
+  });
+
+  document.querySelectorAll('.set-timer').forEach(b=>{
+    b.onclick = ()=>{
+      const row = b.closest('.entry-row');
+      const sec = parseInt(row && row.dataset.restSec, 10);
+      startTimer(sec > 0 ? sec : 60);
+    };
+  });
+
   document.querySelectorAll('.set-add').forEach(b=>{
     b.onclick = ()=>{
       const rows = collectEntryRows();
@@ -999,6 +1181,17 @@ function escapeHtml(s){
   return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function escapeAttr(s){ return escapeHtml(s); }
+
+document.getElementById('timerToggle').onclick = toggleTimer;
+document.getElementById('timerStop').onclick = stopTimer;
+document.getElementById('timerAdd').onclick = ()=> addTimer(30);
+document.addEventListener('visibilitychange', ()=>{
+  // バックグラウンド復帰時に残り時間を再計算し、必要ならウェイクロックを取り直す
+  if(document.visibilityState === 'visible'){
+    if(timer.running){ tickTimer(); requestWakeLock(); }
+    else paintTimer();
+  }
+});
 
 function todayStr(){
   const d = new Date();
