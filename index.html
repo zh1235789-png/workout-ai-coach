@@ -62,6 +62,28 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 .menu-ex .n{font-weight:600}
 .menu-ex .t{color:var(--sub);text-align:right}
 .menu-notes{margin-top:10px;background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:9px 10px;font-size:12.5px;line-height:1.6}
+/* calendar */
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.cal-title{font-size:15px;font-weight:700}
+.cal-nav{background:transparent;border:1px solid var(--border);color:var(--text);width:34px;height:30px;border-radius:8px;font-size:17px;line-height:1;cursor:pointer}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-dow{text-align:center;font-size:10.5px;color:var(--sub);font-weight:700;padding:3px 0}
+.cal-dow.sun{color:#f87171}
+.cal-dow.sat{color:#60a5fa}
+.cal-cell{min-height:38px;border-radius:7px;padding:3px 0 2px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.cal-cell.empty{min-height:0}
+.cal-cell.has-rec{background:var(--bg);cursor:pointer}
+.cal-cell.today{outline:1.5px solid var(--accent)}
+.cal-day{font-size:12px;line-height:1.2}
+.cal-cell.has-rec .cal-day{font-weight:700}
+.cal-marks{display:flex;gap:2px;min-height:7px}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.dot-strength{background:var(--accent)}
+.dot-run{background:#ef4444}
+.dot-walk{background:#3b82f6}
+.cal-legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:11px;color:var(--sub)}
+.cal-legend span{display:flex;align-items:center;gap:4px}
+.cal-legend-total{margin-left:auto;font-weight:700}
 .hist-item{padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer}
 .hist-item:last-child{border-bottom:none}
 .hist-date{font-weight:700;font-size:14px}
@@ -107,7 +129,7 @@ const DEFAULT_EQUIP_2 = `【筋トレマシン(PRECOR製)】ペクトラルフ�
 【有酸素(PRECOR製)】トレッドミル(8台)、クロストレーナー(2台)、リカンベントバイク(2台)、アップライトバイク(2台)
 【その他】ストレッチエリア、体組成計`;
 
-let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null };
+let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null, calMonth: null };
 
 function getSessions(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_SESSIONS)||'[]'); }catch(e){ return []; } }
 function saveSessions(list){ localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list)); }
@@ -244,7 +266,8 @@ function renderHistory(){
   if(sessions.length===0){
     return `<div class="empty">まだ記録がありません。<br>「記録」タブから最初のトレーニングを追加しましょう。</div>`;
   }
-  let html = '<div class="card">';
+  let html = renderCalendar(sessions);
+  html += '<div class="card">';
   sessions.slice().reverse().forEach(s=>{
     const cardioIcon = s.cardio==='run' ? '🏃' : (s.cardio==='walk' ? '🚶' : '');
     let summary;
@@ -261,6 +284,78 @@ function renderHistory(){
     </div>`;
   });
   html += '</div>';
+  return html;
+}
+
+function renderCalendar(sessions){
+  if(state.calMonth===null || state.calMonth===undefined){
+    const t = new Date();
+    state.calMonth = t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0');
+  }
+  const [yStr, mStr] = state.calMonth.split('-');
+  const year = parseInt(yStr,10), month = parseInt(mStr,10);
+
+  // 日付ごとに記録を集約
+  const byDate = {};
+  sessions.forEach(s=>{
+    if(!s.date) return;
+    if(!byDate[s.date]) byDate[s.date] = { strength:false, cardio:null, ids:[] };
+    if(s.type==='cardio'){
+      if(!byDate[s.date].cardio) byDate[s.date].cardio = s.cardio;
+    } else {
+      byDate[s.date].strength = true;
+      if(s.cardio && s.cardio!=='none' && !byDate[s.date].cardio) byDate[s.date].cardio = s.cardio;
+    }
+    byDate[s.date].ids.push(s.id);
+  });
+
+  const first = new Date(year, month-1, 1);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const startDow = first.getDay();
+
+  // 当月の集計
+  let cntStrength = 0, cntCardio = 0;
+  Object.keys(byDate).forEach(d=>{
+    if(d.startsWith(state.calMonth)){
+      if(byDate[d].strength) cntStrength++;
+      if(byDate[d].cardio) cntCardio++;
+    }
+  });
+
+  let html = `<div class="card">
+    <div class="cal-head">
+      <button class="cal-nav" id="calPrev">‹</button>
+      <div class="cal-title">${year}年${month}月</div>
+      <button class="cal-nav" id="calNext">›</button>
+    </div>
+    <div class="cal-grid">`;
+  ['日','月','火','水','木','金','土'].forEach((d,i)=>{
+    html += `<div class="cal-dow${i===0?' sun':(i===6?' sat':'')}">${d}</div>`;
+  });
+  for(let i=0;i<startDow;i++){ html += `<div class="cal-cell empty"></div>`; }
+  const today = todayStr();
+  for(let day=1; day<=daysInMonth; day++){
+    const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const rec = byDate[dateStr];
+    const isToday = dateStr===today;
+    let marks = '';
+    if(rec){
+      if(rec.strength) marks += `<span class="dot dot-strength"></span>`;
+      if(rec.cardio) marks += `<span class="dot ${rec.cardio==='run'?'dot-run':'dot-walk'}"></span>`;
+    }
+    html += `<div class="cal-cell${rec?' has-rec':''}${isToday?' today':''}"${rec?` data-date="${dateStr}" data-id="${rec.ids[0]}"`:''}>
+      <div class="cal-day">${day}</div>
+      <div class="cal-marks">${marks}</div>
+    </div>`;
+  }
+  html += `</div>
+    <div class="cal-legend">
+      <span><span class="dot dot-strength"></span>筋トレ ${cntStrength}日</span>
+      <span><span class="dot dot-run"></span>ランニング</span>
+      <span><span class="dot dot-walk"></span>ウォーキング</span>
+      <span class="cal-legend-total">有酸素 ${cntCardio}日</span>
+    </div>
+  </div>`;
   return html;
 }
 
@@ -405,6 +500,19 @@ function bindEvents(){
       render();
     };
   });
+
+  const calPrev = document.getElementById('calPrev');
+  if(calPrev) calPrev.onclick = ()=>{ state.calMonth = shiftMonth(state.calMonth, -1); render(); };
+  const calNext = document.getElementById('calNext');
+  if(calNext) calNext.onclick = ()=>{ state.calMonth = shiftMonth(state.calMonth, 1); render(); };
+
+  document.querySelectorAll('.cal-cell.has-rec').forEach(el=>{
+    el.onclick = ()=>{
+      const sessions = getSessions();
+      state.viewingSession = sessions.find(s=>s.id===el.dataset.id);
+      render();
+    };
+  });
   const btnCloseDetail = document.getElementById('btnCloseDetail');
   if(btnCloseDetail) btnCloseDetail.onclick = ()=>{ state.viewingSession=null; render(); };
 
@@ -511,6 +619,12 @@ function escapeAttr(s){ return escapeHtml(s); }
 function todayStr(){
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function shiftMonth(ym, delta){
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(y, m-1+delta, 1);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
 }
 
 render();
