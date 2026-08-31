@@ -241,7 +241,7 @@ const DEFAULT_EQUIP_2 = `【マシン種目(PRECOR製)】チェストプレス�
 【保有器具】パワーラック(3台)、スミスマシン、ケーブルマシン、ダンベル、ベンチ、ストレッチエリア、体組成計
 【有酸素(PRECOR製)】トレッドミル(8台)、クロストレーナー(2台)、リカンベントバイク(2台)、アップライトバイク(2台)`;
 
-let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null, pickerTarget: null, bodyDate: null, pain: null, trendEx: null };
+let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null, pickerTarget: null, bodyDate: null, pain: null, trendEx: null, cardioMin: null, cardioKm: null, filterDate: null };
 
 function getSessions(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_SESSIONS)||'[]'); }catch(e){ return []; } }
 function saveSessions(list){ localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list)); }
@@ -251,7 +251,7 @@ function getLastGym(){ return localStorage.getItem(LS_KEY_LAST_GYM) || '1'; }
 
 function switchTab(tab){
   state.tab = tab;
-  state.pendingResult = null; state.error = null; state.viewingSession = null; state.cardio = null; state.cardioLogDate = null;
+  state.pendingResult = null; state.error = null; state.viewingSession = null; state.filterDate = null; state.cardio = null; state.cardioLogDate = null; state.cardioMin = null; state.cardioKm = null;
   state.entryRows = null; state.entryRowsFromMenu = false; state.shareImage = null; state.editDraft = null; state.pain = null;
   render();
 }
@@ -401,7 +401,11 @@ function renderHome(){
       <button data-cardio="walk" class="cardio-btn${state.cardio==='walk'?' sel':''}">ウォーキング</button>
       <button data-cardio="run" class="cardio-btn${state.cardio==='run'?' sel':''}">ランニング</button>
     </div>
-    <div class="field" style="margin-top:12px;margin-bottom:0">
+    <div class="body-row" style="margin-top:10px">
+      <input type="number" id="cardioMin" placeholder="時間（分）" inputmode="numeric" value="${escapeAttr(state.cardioMin||'')}">
+      <input type="number" id="cardioKm" placeholder="距離（km）" inputmode="decimal" step="0.1" value="${escapeAttr(state.cardioKm||'')}">
+    </div>
+    <div class="field" style="margin-top:10px;margin-bottom:0">
       <label>筋トレなしで有酸素だけ記録したい日</label>
       <input type="date" id="inputCardioDate" value="${escapeAttr(state.cardioLogDate)}">
     </div>
@@ -502,7 +506,7 @@ function renderResult(result, isPending){
   if(isPending){ html += `<div class="saved-badge">✓ 解析完了</div>`; }
   html += `<h2>📊 抽出した記録${result.date ? ' — '+escapeHtml(result.date) : ''}</h2>`;
   if(result.cardio && result.cardio!=='none'){
-    html += `<div class="sub" style="margin-bottom:8px">🏃 この日の有酸素: ${escapeHtml(CARDIO_LABELS[result.cardio]||result.cardio)}</div>`;
+    html += `<div class="sub" style="margin-bottom:8px">🏃 この日の有酸素: ${escapeHtml(CARDIO_LABELS[result.cardio]||result.cardio)}${escapeHtml(cardioDetailLabel(result))}</div>`;
   }
   if(result.pain != null){
     html += `<div class="sub" style="margin-bottom:8px">🩹 左ハムの痛み: <b style="color:${painColor(result.pain)}">${result.pain}</b> / 10</div>`;
@@ -869,6 +873,13 @@ function painTrendText(){
   return `\n【左ハムの痛み推移（0=なし〜10=最大）】${recent.map(s=>`${s.date}:${s.pain}`).join(' → ')}`;
 }
 
+function cardioDetailLabel(s){
+  const parts = [];
+  if(s.cardioMin != null) parts.push(`${s.cardioMin}分`);
+  if(s.cardioKm != null) parts.push(`${s.cardioKm}km`);
+  return parts.length ? `（${parts.join(' / ')}）` : '';
+}
+
 function bodyTrendText(){
   const logs = getBodyLogs().slice().sort((a,b)=>a.date.localeCompare(b.date));
   if(logs.length === 0) return '【体組成】記録なし';
@@ -1088,11 +1099,11 @@ function buildShareText(s){
   if(!s) return '';
   let out = `🏋️ ${s.date||''} のトレーニング\n`;
   if(s.type==='cardio'){
-    out += `\n${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}\n`;
+    out += `\n${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}${cardioDetailLabel(s)}\n`;
     return out;
   }
   if(s.cardio && s.cardio!=='none'){
-    out += `${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}あり\n`;
+    out += `${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}${cardioDetailLabel(s)}\n`;
   }
   (s.exercises||[]).forEach(ex=>{
     out += `\n■ ${ex.name}\n`;
@@ -1112,7 +1123,7 @@ function drawShareImage(s){
   const SC = 2, W = 640, PAD = 34;
   const rows = [];
   if(s.type==='cardio'){
-    rows.push({t:'ex', text: s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'});
+    rows.push({t:'ex', text: (s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング') + cardioDetailLabel(s)});
   } else {
     (s.exercises||[]).forEach(ex=>{
       rows.push({t:'ex', text: ex.name});
@@ -1156,7 +1167,7 @@ function drawShareImage(s){
   if(cardioH){
     ctx.fillStyle = '#6b7a89';
     ctx.font = `400 20px ${FONT}`;
-    ctx.fillText(`${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}あり`, PAD, y);
+    ctx.fillText(`${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}${cardioDetailLabel(s)}`, PAD, y);
     y += cardioH;
   }
   y += 6;
@@ -1374,7 +1385,7 @@ function renderHistory(){
     const s = state.viewingSession;
     let html = `<div class="card"><span class="detail-close" id="btnCloseDetail">閉じる ✕</span><div style="clear:both"></div></div>`;
     if(s.type==='cardio'){
-      html += `<div class="card"><h2>${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}</h2><div class="sub">${escapeHtml(s.date||'')}（筋トレなし・有酸素のみの記録）</div></div>`;
+      html += `<div class="card"><h2>${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}${escapeHtml(cardioDetailLabel(s))}</h2><div class="sub">${escapeHtml(s.date||'')}（筋トレなし・有酸素のみの記録）</div></div>`;
       html += renderShareCard();
     } else {
       html += renderResult(s, false);
@@ -1389,12 +1400,20 @@ function renderHistory(){
     return `<div class="empty">まだ記録がありません。<br>「記録」タブから最初のトレーニングを追加しましょう。</div>`;
   }
   let html = renderCalendar(sessions);
+  const shown = state.filterDate ? sessions.filter(s=>s.date === state.filterDate) : sessions;
+  if(state.filterDate){
+    html += `<div class="card">
+      <span class="detail-close" id="btnClearDateFilter">すべて表示 ✕</span>
+      <div style="clear:both"></div>
+      <div class="sub" style="margin-top:4px">${escapeHtml(state.filterDate)} の記録（${shown.length}件）</div>
+    </div>`;
+  }
   html += '<div class="card">';
-  sessions.slice().reverse().forEach(s=>{
+  shown.slice().reverse().forEach(s=>{
     const cardioIcon = s.cardio==='run' ? '🏃' : (s.cardio==='walk' ? '🚶' : '');
     let summary;
     if(s.type==='cardio'){
-      summary = `${s.cardio==='run'?'ランニング':'ウォーキング'}のみ（筋トレなし）`;
+      summary = escapeHtml(`${s.cardio==='run'?'ランニング':'ウォーキング'}${cardioDetailLabel(s)}のみ（筋トレなし）`);
     } else {
       const names = (s.exercises||[]).map(e=>e.name).join('、');
       const nextFocus = s.next_menu ? `　→次回: ${s.next_menu.focus||''}` : '';
@@ -1465,7 +1484,7 @@ function renderCalendar(sessions){
       if(rec.strength) marks += `<span class="dot dot-strength"></span>`;
       if(rec.cardio) marks += `<span class="dot ${rec.cardio==='run'?'dot-run':'dot-walk'}"></span>`;
     }
-    html += `<div class="cal-cell${rec?' has-rec':''}${isToday?' today':''}"${rec?` data-date="${dateStr}" data-id="${rec.ids[0]}"`:''}>
+    html += `<div class="cal-cell${rec?' has-rec':''}${isToday?' today':''}"${rec?` data-date="${dateStr}"`:''}>
       <div class="cal-day">${day}</div>
       <div class="cal-marks">${marks}</div>
     </div>`;
@@ -1651,8 +1670,19 @@ function bindEvents(){
   });
 
   document.querySelectorAll('.cardio-btn').forEach(b=>{
-    b.onclick = ()=>{ state.cardio = b.dataset.cardio; render(); };
+    b.onclick = ()=>{
+      const mn = document.getElementById('cardioMin'), km = document.getElementById('cardioKm');
+      if(mn) state.cardioMin = mn.value;
+      if(km) state.cardioKm = km.value;
+      state.cardio = b.dataset.cardio;
+      render();
+    };
   });
+
+  const cardioMin = document.getElementById('cardioMin');
+  if(cardioMin) cardioMin.oninput = ()=>{ state.cardioMin = cardioMin.value; };
+  const cardioKm = document.getElementById('cardioKm');
+  if(cardioKm) cardioKm.oninput = ()=>{ state.cardioKm = cardioKm.value; };
 
   const inputCardioDate = document.getElementById('inputCardioDate');
   if(inputCardioDate) inputCardioDate.onchange = ()=>{ state.cardioLogDate = inputCardioDate.value; };
@@ -1671,7 +1701,9 @@ function bindEvents(){
         type: 'cardio',
         date: state.cardioLogDate || todayStr(),
         cardio: state.cardio,
-        pain: state.pain != null ? state.pain : null
+        pain: state.pain != null ? state.pain : null,
+        cardioMin: numOrNull(state.cardioMin),
+        cardioKm: numOrNull(state.cardioKm)
       };
       sessions.push(entry);
       saveSessions(sessions);
@@ -1908,6 +1940,8 @@ function bindEvents(){
       result.id = Date.now().toString();
       result.cardio = state.cardio || 'none';
       result.pain = state.pain != null ? state.pain : null;
+      result.cardioMin = numOrNull(state.cardioMin);
+      result.cardioKm = numOrNull(state.cardioKm);
       rememberExerciseNames((result.exercises||[]).map(e=>e.name));
       sessions.push(result);
       saveSessions(sessions);
@@ -1967,12 +2001,23 @@ function bindEvents(){
 
   document.querySelectorAll('.cal-cell.has-rec').forEach(el=>{
     el.onclick = ()=>{
-      const sessions = getSessions();
-      state.viewingSession = sessions.find(s=>s.id===el.dataset.id);
+      const date = el.dataset.date;
+      const sameDay = getSessions().filter(s=>s.date === date);
       state.shareImage = null;
+      if(sameDay.length === 1){
+        state.viewingSession = sameDay[0];
+        state.filterDate = null;
+      } else {
+        // 同じ日に複数の記録がある場合は、その日の一覧を表示する
+        state.viewingSession = null;
+        state.filterDate = date;
+      }
       render();
     };
   });
+
+  const btnClearDateFilter = document.getElementById('btnClearDateFilter');
+  if(btnClearDateFilter) btnClearDateFilter.onclick = ()=>{ state.filterDate = null; render(); };
   const btnShareImg = document.getElementById('btnShareImg');
   if(btnShareImg) btnShareImg.onclick = async ()=>{
     const s = shareTargetSession();
@@ -2156,7 +2201,7 @@ function buildPrompt(gymId, cardio, workoutText, pain){
   if(sessions.length>0){
     historyText = sessions.map(s=>{
       if(s.type==='cardio'){
-        return `${s.date}: 有酸素のみ（${CARDIO_LABELS[s.cardio]||s.cardio}）、筋トレなし`;
+        return `${s.date}: 有酸素のみ ${CARDIO_LABELS[s.cardio]||s.cardio}${cardioDetailLabel(s)}、筋トレなし`;
       }
       const detail = (s.exercises||[]).map(e=>{
         // 本番セットの「重量×回数」を並べる（アップは漸進性の判断に不要なので除く）
@@ -2167,13 +2212,14 @@ function buildPrompt(gymId, cardio, workoutText, pain){
       }).join(' / ');
       const cat = s.next_menu && s.next_menu.category ? s.next_menu.category : '不明';
       const cardioLabel = CARDIO_LABELS[s.cardio] || '記録なし';
-      return `${s.date} [${cat}] 有酸素=${cardioLabel}\n    ${detail}\n    評価メモ: ${(s.evaluation||'').slice(0,100)}`;
+      return `${s.date} [${cat}] 有酸素=${cardioLabel}${cardioDetailLabel(s)}\n    ${detail}\n    評価メモ: ${(s.evaluation||'').slice(0,100)}`;
     }).join('\n');
   }
   const gymName = GYM_NAMES[gymId];
   const gymEquip = getGymEquip(gymId);
   const cardioLabel = CARDIO_LABELS[cardio] || 'なし';
   const painLabel = (pain != null) ? String(pain) : '未記録';
+  const cardioAmountLabel = cardioDetailLabel({ cardioMin: numOrNull(state.cardioMin), cardioKm: numOrNull(state.cardioKm) });
   const intro = workoutText
     ? `あなたは経験豊富なパーソナルトレーナーです。以下の「今日のトレーニング内容」をもとに、評価と次回のトレーニングメニューを提案してください。
 
@@ -2203,7 +2249,7 @@ ${historyText}
 【今日の左ハムの痛み】${painLabel}（0=なし〜10=最大）${painTrendText()}
 痛みが1以上の日は脚種目を提案せず、3以上なら評価コメントで運動強度を落とすよう明確に助言してください。0が続いている場合のみ、脚種目を段階的に再開する提案をしてください。
 
-【今日の有酸素運動】${cardioLabel}
+【今日の有酸素運動】${cardioLabel}${cardioAmountLabel}
 ランニングをした日は脚トレを行わない方針です。今日ランニングをしている場合、今回のトレーニング内容に脚種目が含まれていれば評価コメントで軽く触れてください。また、次回メニューのカテゴリが"Legs+"になる場合は、notesに必ず「ランニングをする予定の日は脚トレを避けてください」という趣旨の注意を含めてください。
 
 【次回トレーニングを行うジム】${gymName}
