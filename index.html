@@ -87,6 +87,14 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 .set-add{background:transparent;border:1px dashed var(--border);color:var(--sub);border-radius:8px;padding:6px 0;width:100%;font-size:12px;margin-top:7px;cursor:pointer}
 .warm-hint{font-size:11px;color:var(--warn);margin:3px 0 0 43px}
 .share-preview{width:100%;border-radius:10px;border:1px solid var(--border);margin-top:12px;display:block}
+/* body metrics & charts */
+.body-row{display:flex;gap:6px}
+.body-row input{flex:1;min-width:0;padding:9px;font-size:13px}
+.chart{width:100%;height:130px;display:block}
+.chart .grid{stroke:var(--border);stroke-width:1}
+.chart .axis{fill:var(--sub);font-size:9px}
+.chart-single{color:var(--sub);font-size:13px;padding:10px 0}
+.chart-single span{display:block;font-size:11.5px;margin-top:4px}
 /* exercise picker */
 .picker-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40;display:flex;align-items:flex-end;justify-content:center}
 .picker-sheet{background:var(--card);width:100%;max-width:560px;max-height:82vh;border-radius:16px 16px 0 0;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
@@ -178,6 +186,7 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 <nav class="tabbar">
   <button data-tab="home" class="tab-btn"><span class="ic">📝</span>記録</button>
   <button data-tab="history" class="tab-btn"><span class="ic">📋</span>履歴</button>
+  <button data-tab="trends" class="tab-btn"><span class="ic">📈</span>推移</button>
   <button data-tab="settings" class="tab-btn"><span class="ic">⚙️</span>設定</button>
 </nav>
 
@@ -207,7 +216,7 @@ const DEFAULT_EQUIP_2 = `【マシン種目(PRECOR製)】チェストプレス�
 【保有器具】パワーラック(3台)、スミスマシン、ケーブルマシン、ダンベル、ベンチ、ストレッチエリア、体組成計
 【有酸素(PRECOR製)】トレッドミル(8台)、クロストレーナー(2台)、リカンベントバイク(2台)、アップライトバイク(2台)`;
 
-let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null, pickerTarget: null };
+let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null, pickerTarget: null, bodyDate: null };
 
 function getSessions(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_SESSIONS)||'[]'); }catch(e){ return []; } }
 function saveSessions(list){ localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list)); }
@@ -316,6 +325,7 @@ function render(){
   const app = document.getElementById('app');
   if(state.tab==='home') app.innerHTML = renderHome();
   else if(state.tab==='history') app.innerHTML = renderHistory();
+  else if(state.tab==='trends') app.innerHTML = renderTrends();
   else app.innerHTML = renderSettings();
   refreshExerciseDatalist();
   bindEvents();
@@ -351,6 +361,8 @@ function renderHome(){
     <button class="btn btn-secondary" id="btnLogCardioOnly" style="margin-top:10px">この内容だけ記録する（筋トレなし）</button>
     <div id="cardioLogSaved" class="center-msg" style="display:none;color:var(--ok)">✓ 記録しました</div>
   </div>`;
+
+  html += renderBodyInputCard();
 
   html += `<div class="card">
     <h2>⏱ インターバルタイマー</h2>
@@ -753,6 +765,104 @@ function paintTimer(){
   document.getElementById('timerToggle').style.display = done ? 'none' : '';
   document.getElementById('timerProgress').style.width =
     (done ? 100 : Math.min(100, (1 - timer.remaining/timer.total) * 100)) + '%';
+}
+
+/* ===== 体組成 ===== */
+function latestBody(){
+  const logs = getBodyLogs().slice().sort((a,b)=>a.date.localeCompare(b.date));
+  return logs.length ? logs[logs.length-1] : null;
+}
+
+function fmtDelta(cur, prev, unit){
+  if(prev == null || cur == null) return '';
+  const d = +(cur - prev).toFixed(1);
+  if(d === 0) return `（前回と同じ）`;
+  return `（前回比 ${d > 0 ? '+' : ''}${d}${unit}）`;
+}
+
+function bodyTrendText(){
+  const logs = getBodyLogs().slice().sort((a,b)=>a.date.localeCompare(b.date));
+  if(logs.length === 0) return '【体組成】記録なし';
+  const last = logs[logs.length-1];
+  const first = logs[0];
+  const cur = `最新(${last.date}) 体重${last.weight!=null?last.weight+'kg':'—'} / 体脂肪${last.fat!=null?last.fat+'%':'—'}`;
+  if(logs.length === 1) return `【体組成】${cur}`;
+  const dw = (last.weight!=null && first.weight!=null) ? `体重${(last.weight-first.weight>0?'+':'')}${(+(last.weight-first.weight).toFixed(1))}kg` : '';
+  const df = (last.fat!=null && first.fat!=null) ? `体脂肪${(last.fat-first.fat>0?'+':'')}${(+(last.fat-first.fat).toFixed(1))}%` : '';
+  return `【体組成】${cur}（${first.date}から ${[dw,df].filter(Boolean).join('・')}）\n体脂肪率の低下が目標なので、停滞している場合は有酸素量や種目構成について評価コメントで触れてください。`;
+}
+
+function renderBodyInputCard(){
+  if(state.bodyDate === null || state.bodyDate === undefined) state.bodyDate = todayStr();
+  const logs = getBodyLogs().slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const last = logs.length ? logs[logs.length-1] : null;
+  const prev = logs.length > 1 ? logs[logs.length-2] : null;
+  let summary = '<div class="sub">まだ記録がありません。ジムの体組成計で測ったら入力してください。</div>';
+  if(last){
+    summary = `<div class="sub">最新: ${escapeHtml(last.date)}　`
+      + (last.weight!=null ? `体重 <b>${last.weight}kg</b>${fmtDelta(last.weight, prev&&prev.weight, 'kg')}　` : '')
+      + (last.fat!=null ? `体脂肪 <b>${last.fat}%</b>${fmtDelta(last.fat, prev&&prev.fat, '%')}` : '')
+      + `</div>`;
+  }
+  return `<div class="card">
+    <h2>⚖️ 体組成</h2>
+    ${summary}
+    <div class="body-row" style="margin-top:10px">
+      <input type="date" id="bodyDate" value="${escapeAttr(state.bodyDate)}">
+      <input type="number" id="bodyWeight" placeholder="体重kg" inputmode="decimal" step="0.1">
+      <input type="number" id="bodyFat" placeholder="体脂肪%" inputmode="decimal" step="0.1">
+    </div>
+    <button class="btn btn-secondary" id="btnSaveBody" style="margin-top:10px">体組成を記録</button>
+    <div id="bodySaved" class="center-msg" style="display:none;color:var(--ok)">✓ 記録しました</div>
+  </div>`;
+}
+
+/* ===== 折れ線グラフ ===== */
+function lineChartSVG(data, unit, color){
+  // data: [{date, value}] 昇順
+  if(data.length === 0) return `<div class="sub">データがありません。</div>`;
+  const W = 320, H = 130, L = 38, R = 10, T = 12, B = 22;
+  if(data.length === 1){
+    return `<div class="chart-single">${data[0].value}${unit}<span>（${escapeHtml(data[0].date)}）記録が2件以上になるとグラフが表示されます</span></div>`;
+  }
+  const vals = data.map(d=>d.value);
+  let min = Math.min(...vals), max = Math.max(...vals);
+  if(min === max){ min -= 1; max += 1; }
+  const pad = (max - min) * 0.15;
+  min -= pad; max += pad;
+  const x = i => L + (W - L - R) * (i / (data.length - 1));
+  const y = v => T + (H - T - B) * (1 - (v - min) / (max - min));
+  const pts = data.map((d,i)=>`${x(i).toFixed(1)},${y(d.value).toFixed(1)}`).join(' ');
+  const dots = data.map((d,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${y(d.value).toFixed(1)}" r="2.6" fill="${color}"/>`).join('');
+  const first = data[0], lastD = data[data.length-1];
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">
+    <line x1="${L}" y1="${y(max-pad).toFixed(1)}" x2="${W-R}" y2="${y(max-pad).toFixed(1)}" class="grid"/>
+    <line x1="${L}" y1="${y(min+pad).toFixed(1)}" x2="${W-R}" y2="${y(min+pad).toFixed(1)}" class="grid"/>
+    <text x="4" y="${(y(max-pad)+3.5).toFixed(1)}" class="axis">${(+(max-pad).toFixed(1))}</text>
+    <text x="4" y="${(y(min+pad)+3.5).toFixed(1)}" class="axis">${(+(min+pad).toFixed(1))}</text>
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}
+    <text x="${L}" y="${H-6}" class="axis">${escapeHtml(first.date.slice(5))}</text>
+    <text x="${W-R}" y="${H-6}" class="axis" text-anchor="end">${escapeHtml(lastD.date.slice(5))}</text>
+  </svg>`;
+}
+
+function renderTrends(){
+  const logs = getBodyLogs().slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const weight = logs.filter(b=>b.weight!=null).map(b=>({date:b.date, value:b.weight}));
+  const fat = logs.filter(b=>b.fat!=null).map(b=>({date:b.date, value:b.fat}));
+
+  let html = `<div class="card">
+    <h2>⚖️ 体重</h2>
+    ${lineChartSVG(weight, 'kg', '#f97316')}
+    ${weight.length>=2 ? `<div class="sub" style="margin-top:8px">${weight[0].date} から ${(+(weight[weight.length-1].value - weight[0].value).toFixed(1))}kg</div>` : ''}
+  </div>
+  <div class="card">
+    <h2>📉 体脂肪率</h2>
+    ${lineChartSVG(fat, '%', '#3b82f6')}
+    ${fat.length>=2 ? `<div class="sub" style="margin-top:8px">${fat[0].date} から ${(+(fat[fat.length-1].value - fat[0].value).toFixed(1))}%</div>` : ''}
+  </div>`;
+  return html;
 }
 
 function setWeightLabel(s){
@@ -1429,6 +1539,38 @@ function bindEvents(){
     };
   });
 
+  const bodyDate = document.getElementById('bodyDate');
+  if(bodyDate) bodyDate.onchange = ()=>{ state.bodyDate = bodyDate.value; };
+
+  const btnSaveBody = document.getElementById('btnSaveBody');
+  if(btnSaveBody) btnSaveBody.onclick = ()=>{
+    const date = document.getElementById('bodyDate').value || todayStr();
+    const weight = numOrNull(document.getElementById('bodyWeight').value);
+    const fat = numOrNull(document.getElementById('bodyFat').value);
+    if(weight == null && fat == null){
+      state.error = '体重か体脂肪率のどちらかを入力してください。';
+      render();
+      return;
+    }
+    const logs = getBodyLogs();
+    const idx = logs.findIndex(b=>b.date === date);
+    const entry = { date, weight, fat };
+    if(idx >= 0){
+      // 同じ日は上書き（未入力の項目は既存値を残す）
+      entry.weight = weight != null ? weight : logs[idx].weight;
+      entry.fat = fat != null ? fat : logs[idx].fat;
+      logs[idx] = entry;
+    } else {
+      logs.push(entry);
+    }
+    logs.sort((a,b)=>a.date.localeCompare(b.date));
+    saveBodyLogs(logs);
+    state.error = null;
+    render();
+    const msg = document.getElementById('bodySaved');
+    if(msg){ msg.style.display='block'; setTimeout(()=>{ msg.style.display='none'; }, 1800); }
+  };
+
   const btnPickEx = document.getElementById('btnPickEx');
   if(btnPickEx) btnPickEx.onclick = ()=>{ state.entryRows = collectEntryRows(); openPicker('home'); };
 
@@ -1834,6 +1976,7 @@ ${workoutText}`
 【ユーザー情報】
 ${getCondition()}
 腹筋(アブドミナル、ロータリートルソー等)は自宅で別途鍛えているため、ジムでの提案は控えめにしてください（must_exercisesには含めず、optional_exercisesに含める場合も1種目までにする）。
+${bodyTrendText()}
 
 【3分割ローテーション】
 次回メニューのfocus/categoryは、必ず以下の3カテゴリのいずれか1つにしてください。
