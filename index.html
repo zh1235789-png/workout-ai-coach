@@ -87,6 +87,10 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 .set-add{background:transparent;border:1px dashed var(--border);color:var(--sub);border-radius:8px;padding:6px 0;width:100%;font-size:12px;margin-top:7px;cursor:pointer}
 .warm-hint{font-size:11px;color:var(--warn);margin:3px 0 0 43px}
 .share-preview{width:100%;border-radius:10px;border:1px solid var(--border);margin-top:12px;display:block}
+/* RPE */
+.rpe-row{display:flex;align-items:center;gap:8px;margin-top:8px}
+.rpe-label{font-size:11.5px;color:var(--sub);font-weight:600;flex-shrink:0}
+.rpe-select{flex:1;min-width:0;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12.5px;font-family:inherit}
 /* pain score */
 .pain-row{display:flex;gap:3px}
 .pain-btn{flex:1;min-width:0;padding:9px 0;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:12px;font-weight:700;cursor:pointer}
@@ -245,8 +249,27 @@ function getLastStrengthSession(){
   return sessions.sort((a,b)=>(a.date||'').localeCompare(b.date||''))[sessions.length-1];
 }
 
+// RPE: 主観的運動強度。10=これ以上1回も挙がらない、8=あと2回できた、など
+const RPE_OPTIONS = [
+  ['', '未入力'],
+  ['10', '10 限界（あと0回）'],
+  ['9.5', '9.5 あと0〜1回'],
+  ['9', '9 あと1回'],
+  ['8.5', '8.5 あと1〜2回'],
+  ['8', '8 あと2回'],
+  ['7', '7 あと3回'],
+  ['6', '6 あと4回以上'],
+  ['5', '5 かなり余裕']
+];
+
+function rpeOptions(selected){
+  return RPE_OPTIONS.map(([v,label])=>
+    `<option value="${v}"${String(selected||'')===v?' selected':''}>${escapeHtml(label)}</option>`
+  ).join('');
+}
+
 function emptySet(){ return { weight:'', reps:'', warmup:false }; }
-function emptyRow(){ return { name:'', sets:[emptySet(), emptySet(), emptySet()] }; }
+function emptyRow(){ return { name:'', sets:[emptySet(), emptySet(), emptySet()], rpe:'' }; }
 
 function buildInitialEntryRows(){
   const last = getLastStrengthSession();
@@ -270,7 +293,7 @@ function buildInitialEntryRows(){
     }
     const n = countTargetSets(e.target);
     for(let i=0;i<n;i++) sets.push(emptySet());
-    return { name: e.name, sets, hint: e.target||'', warmupHint: warm ? formatWarmupHint(warm) : '', restSec: parseRestSeconds(e.rest) || '' };
+    return { name: e.name, sets, rpe:'', hint: e.target||'', warmupHint: warm ? formatWarmupHint(warm) : '', restSec: parseRestSeconds(e.rest) || '' };
   });
 }
 
@@ -299,9 +322,11 @@ function collectEntryRows(){
         warmup: sEl.dataset.warmup === '1'
       });
     });
+    const rpeEl = el.querySelector('.rpe-select');
     rows.push({
       name: el.querySelector('.entry-name').value,
       sets,
+      rpe: rpeEl ? rpeEl.value : '',
       hint: el.dataset.hint || '',
       warmupHint: el.dataset.warmupHint || '',
       restSec: el.dataset.restSec || ''
@@ -324,7 +349,8 @@ function entryRowsToText(rows){
         const label = s.warmup ? 'アップ' : 'セット'+(++workIdx);
         return `    ${label}: ${wPart}${rPart}`;
       });
-    return `- ${r.name.trim()}\n${lines.join('\n')}`;
+    const rpe = r.rpe ? `（最終セットRPE ${r.rpe}）` : '';
+    return `- ${r.name.trim()}${rpe}\n${lines.join('\n')}`;
   }).join('\n');
 }
 
@@ -426,7 +452,11 @@ function renderHome(){
         html += `<div class="warm-hint">↑ 推奨: ${escapeHtml(r.warmupHint)}</div>`;
       }
     });
-    html += `<button class="set-add" data-i="${i}">＋ セット追加</button>
+    html += `<div class="rpe-row">
+        <span class="rpe-label">最終セットのRPE</span>
+        <select class="rpe-select" data-i="${i}">${rpeOptions(r.rpe)}</select>
+      </div>
+      <button class="set-add" data-i="${i}">＋ セット追加</button>
     </div>`;
   });
   html += `</div>
@@ -646,7 +676,7 @@ function pickExercise(name){
     if(last && !last.name.trim() && last.sets.every(s=>s.weight==='' && s.reps==='')){
       last.name = name;
     } else {
-      rows.push({ name, sets:[emptySet(), emptySet(), emptySet()], hint:'', warmupHint:'', restSec:'' });
+      rows.push({ name, sets:[emptySet(), emptySet(), emptySet()], rpe:'', hint:'', warmupHint:'', restSec:'' });
     }
     state.entryRows = rows;
   }
@@ -2044,6 +2074,7 @@ ${bodyTrendText()}
 
 【直近のセッション履歴（各種目は本番セットの「重量×回数」を時系列で記載）】
 ${historyText}
+今日のトレーニング内容にRPE（主観的追い込み度。10=限界であと0回、8=あと2回できた、7=あと3回）が記載されている種目は、それを最優先の判断材料にしてください。RPE 6〜7なら重量を上げ、8〜9なら現状維持、9.5〜10なら据え置きか回数調整、という方針で次回の重量を決めてください。
 上記の過去の重量・回数を必ず参照し、次回メニューのtargetには「前回○kgだったので今回は△kg」と具体的な重量を提示してください。同じ種目を過去にやっている場合は、その実績から漸進的に負荷を上げる（伸びていなければ据え置き・回数で調整する）判断をしてください。評価コメントでも、前回の同一種目と比較した増減に言及してください。
 
 【今日の左ハムの痛み】${painLabel}（0=なし〜10=最大）${painTrendText()}
