@@ -87,6 +87,14 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 .set-add{background:transparent;border:1px dashed var(--border);color:var(--sub);border-radius:8px;padding:6px 0;width:100%;font-size:12px;margin-top:7px;cursor:pointer}
 .warm-hint{font-size:11px;color:var(--warn);margin:3px 0 0 43px}
 .share-preview{width:100%;border-radius:10px;border:1px solid var(--border);margin-top:12px;display:block}
+/* pain score */
+.pain-row{display:flex;gap:3px}
+.pain-btn{flex:1;min-width:0;padding:9px 0;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:12px;font-weight:700;cursor:pointer}
+.pain-btn.sel{color:#fff;border-color:transparent}
+.pain-note{margin-top:9px;font-size:12.5px;padding:8px 10px;border-radius:8px;line-height:1.55}
+.pain-note.ok{background:var(--ok-bg);color:var(--ok)}
+.pain-note.warn{background:var(--warn-bg);color:var(--warn)}
+.pain-note.danger{background:var(--danger-bg);color:var(--danger)}
 /* body metrics & charts */
 .body-row{display:flex;gap:6px}
 .body-row input{flex:1;min-width:0;padding:9px;font-size:13px}
@@ -216,7 +224,7 @@ const DEFAULT_EQUIP_2 = `【マシン種目(PRECOR製)】チェストプレス�
 【保有器具】パワーラック(3台)、スミスマシン、ケーブルマシン、ダンベル、ベンチ、ストレッチエリア、体組成計
 【有酸素(PRECOR製)】トレッドミル(8台)、クロストレーナー(2台)、リカンベントバイク(2台)、アップライトバイク(2台)`;
 
-let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null, pickerTarget: null, bodyDate: null };
+let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null, pickerTarget: null, bodyDate: null, pain: null };
 
 function getSessions(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_SESSIONS)||'[]'); }catch(e){ return []; } }
 function saveSessions(list){ localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list)); }
@@ -227,7 +235,7 @@ function getLastGym(){ return localStorage.getItem(LS_KEY_LAST_GYM) || '1'; }
 function switchTab(tab){
   state.tab = tab;
   state.pendingResult = null; state.error = null; state.viewingSession = null; state.cardio = null; state.cardioLogDate = null;
-  state.entryRows = null; state.entryRowsFromMenu = false; state.shareImage = null; state.editDraft = null;
+  state.entryRows = null; state.entryRowsFromMenu = false; state.shareImage = null; state.editDraft = null; state.pain = null;
   render();
 }
 
@@ -362,6 +370,16 @@ function renderHome(){
     <div id="cardioLogSaved" class="center-msg" style="display:none;color:var(--ok)">✓ 記録しました</div>
   </div>`;
 
+  if(state.pain === null || state.pain === undefined) state.pain = 0;
+  html += `<div class="card">
+    <h2>🩹 左ハムの痛み（0〜10）</h2>
+    <div class="sub" style="margin-bottom:8px">運動中・運動後の最大の痛みを選んでください。脚トレ再開の判断に使います。</div>
+    <div class="pain-row">`;
+  for(let i=0;i<=10;i++){
+    html += `<button class="pain-btn${state.pain===i?' sel':''}" data-pain="${i}" style="${state.pain===i?`background:${painColor(i)}`:''}">${i}</button>`;
+  }
+  html += `</div>${painNote(state.pain)}</div>`;
+
   html += renderBodyInputCard();
 
   html += `<div class="card">
@@ -442,6 +460,9 @@ function renderResult(result, isPending){
   html += `<h2>📊 抽出した記録${result.date ? ' — '+escapeHtml(result.date) : ''}</h2>`;
   if(result.cardio && result.cardio!=='none'){
     html += `<div class="sub" style="margin-bottom:8px">🏃 この日の有酸素: ${escapeHtml(CARDIO_LABELS[result.cardio]||result.cardio)}</div>`;
+  }
+  if(result.pain != null){
+    html += `<div class="sub" style="margin-bottom:8px">🩹 左ハムの痛み: <b style="color:${painColor(result.pain)}">${result.pain}</b> / 10</div>`;
   }
   (result.exercises||[]).forEach(ex=>{
     html += `<div class="ex-row"><div class="ex-name">${escapeHtml(ex.name)}${ex.maxRM?`<span class="ex-max">MAX 1RM ${ex.maxRM}kg</span>`:''}</div>`;
@@ -778,6 +799,31 @@ function fmtDelta(cur, prev, unit){
   const d = +(cur - prev).toFixed(1);
   if(d === 0) return `（前回と同じ）`;
   return `（前回比 ${d > 0 ? '+' : ''}${d}${unit}）`;
+}
+
+/* ===== 痛みスコア ===== */
+function painColor(v){
+  if(v === 0) return '#16a34a';
+  if(v <= 2) return '#65a30d';
+  if(v <= 4) return '#ca8a04';
+  if(v <= 6) return '#ea580c';
+  return '#dc2626';
+}
+
+function painNote(v){
+  if(v === 0) return `<div class="pain-note ok">痛みなし。基準を満たせば脚トレの負荷を上げてよい段階です。</div>`;
+  if(v <= 2) return `<div class="pain-note warn">軽い違和感。現状維持で様子を見てください。重量を上げるのは見送り。</div>`;
+  if(v <= 4) return `<div class="pain-note warn">中等度の痛み。脚トレは中止し、上半身中心に切り替えてください。</div>`;
+  return `<div class="pain-note danger">強い痛みです。トレーニングを中止し、ランニングも控えてください。続く場合は受診を。</div>`;
+}
+
+function painTrendText(){
+  const recent = getSessions().slice()
+    .filter(s=>s.pain != null)
+    .sort((a,b)=>(a.date||'').localeCompare(b.date||''))
+    .slice(-5);
+  if(recent.length === 0) return '';
+  return `\n【左ハムの痛み推移（0=なし〜10=最大）】${recent.map(s=>`${s.date}:${s.pain}`).join(' → ')}`;
 }
 
 function bodyTrendText(){
@@ -1475,7 +1521,8 @@ function bindEvents(){
         id: Date.now().toString(),
         type: 'cardio',
         date: state.cardioLogDate || todayStr(),
-        cardio: state.cardio
+        cardio: state.cardio,
+        pain: state.pain != null ? state.pain : null
       };
       sessions.push(entry);
       saveSessions(sessions);
@@ -1535,6 +1582,14 @@ function bindEvents(){
       const list = getCustomExercises();
       list.splice(+b.dataset.i, 1);
       saveCustomExercises(list);
+      render();
+    };
+  });
+
+  document.querySelectorAll('.pain-btn').forEach(b=>{
+    b.onclick = ()=>{
+      state.entryRows = collectEntryRows();
+      state.pain = +b.dataset.pain;
       render();
     };
   });
@@ -1672,7 +1727,7 @@ function bindEvents(){
   if(btnCopyPrompt) btnCopyPrompt.onclick = async ()=>{
     state.entryRows = collectEntryRows();
     rememberExerciseNames(state.entryRows.map(r=>r.name));
-    const prompt = buildPrompt(state.selectedGym, state.cardio, entryRowsToText(state.entryRows));
+    const prompt = buildPrompt(state.selectedGym, state.cardio, entryRowsToText(state.entryRows), state.pain);
     await copyToClipboard(prompt);
     const msg = document.getElementById('copyDone');
     msg.style.display='block';
@@ -1700,6 +1755,7 @@ function bindEvents(){
       const result = state.pendingResult;
       result.id = Date.now().toString();
       result.cardio = state.cardio || 'none';
+      result.pain = state.pain != null ? state.pain : null;
       rememberExerciseNames((result.exercises||[]).map(e=>e.name));
       sessions.push(result);
       saveSessions(sessions);
@@ -1942,7 +1998,7 @@ function parseClaudeJson(text){
   return JSON.parse(t);
 }
 
-function buildPrompt(gymId, cardio, workoutText){
+function buildPrompt(gymId, cardio, workoutText, pain){
   const sessions = getSessions().slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).slice(-5);
   let historyText = 'なし（初回の記録です）';
   if(sessions.length>0){
@@ -1965,6 +2021,7 @@ function buildPrompt(gymId, cardio, workoutText){
   const gymName = GYM_NAMES[gymId];
   const gymEquip = getGymEquip(gymId);
   const cardioLabel = CARDIO_LABELS[cardio] || 'なし';
+  const painLabel = (pain != null) ? String(pain) : '未記録';
   const intro = workoutText
     ? `あなたは経験豊富なパーソナルトレーナーです。以下の「今日のトレーニング内容」をもとに、評価と次回のトレーニングメニューを提案してください。
 
@@ -1988,6 +2045,9 @@ ${bodyTrendText()}
 【直近のセッション履歴（各種目は本番セットの「重量×回数」を時系列で記載）】
 ${historyText}
 上記の過去の重量・回数を必ず参照し、次回メニューのtargetには「前回○kgだったので今回は△kg」と具体的な重量を提示してください。同じ種目を過去にやっている場合は、その実績から漸進的に負荷を上げる（伸びていなければ据え置き・回数で調整する）判断をしてください。評価コメントでも、前回の同一種目と比較した増減に言及してください。
+
+【今日の左ハムの痛み】${painLabel}（0=なし〜10=最大）${painTrendText()}
+痛みが1以上の日は脚種目を提案せず、3以上なら評価コメントで運動強度を落とすよう明確に助言してください。0が続いている場合のみ、脚種目を段階的に再開する提案をしてください。
 
 【今日の有酸素運動】${cardioLabel}
 ランニングをした日は脚トレを行わない方針です。今日ランニングをしている場合、今回のトレーニング内容に脚種目が含まれていれば評価コメントで軽く触れてください。また、次回メニューのカテゴリが"Legs+"になる場合は、notesに必ず「ランニングをする予定の日は脚トレを避けてください」という趣旨の注意を含めてください。
