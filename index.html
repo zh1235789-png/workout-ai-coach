@@ -87,6 +87,19 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 .set-add{background:transparent;border:1px dashed var(--border);color:var(--sub);border-radius:8px;padding:6px 0;width:100%;font-size:12px;margin-top:7px;cursor:pointer}
 .warm-hint{font-size:11px;color:var(--warn);margin:3px 0 0 43px}
 .share-preview{width:100%;border-radius:10px;border:1px solid var(--border);margin-top:12px;display:block}
+/* weekly volume */
+.vol-row{display:flex;align-items:center;gap:8px;padding:5px 0}
+.vol-part{width:34px;flex-shrink:0;font-size:12.5px;font-weight:700}
+.vol-bar{flex:1;height:9px;background:var(--bg);border-radius:5px;overflow:hidden}
+.vol-fill{display:block;height:100%;background:var(--border);border-radius:5px}
+.vol-fill.low{background:#eab308}
+.vol-fill.good{background:#16a34a}
+.vol-fill.over{background:#dc2626}
+.vol-num{width:74px;flex-shrink:0;text-align:right;font-size:12.5px;font-weight:700;color:var(--sub)}
+.vol-num.low{color:#eab308}.vol-num.good{color:#16a34a}.vol-num.over{color:#dc2626}
+.vol-prev{font-weight:normal;font-size:10.5px;color:var(--sub)}
+.vol-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;font-size:10.5px;color:var(--sub);align-items:center}
+.vol-dot-low{background:#eab308}.vol-dot-good{background:#16a34a}.vol-dot-over{background:#dc2626}
 /* RPE */
 .rpe-row{display:flex;align-items:center;gap:8px;margin-top:8px}
 .rpe-label{font-size:11.5px;color:var(--sub);font-weight:600;flex-shrink:0}
@@ -228,7 +241,7 @@ const DEFAULT_EQUIP_2 = `【マシン種目(PRECOR製)】チェストプレス�
 【保有器具】パワーラック(3台)、スミスマシン、ケーブルマシン、ダンベル、ベンチ、ストレッチエリア、体組成計
 【有酸素(PRECOR製)】トレッドミル(8台)、クロストレーナー(2台)、リカンベントバイク(2台)、アップライトバイク(2台)`;
 
-let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null, pickerTarget: null, bodyDate: null, pain: null };
+let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null, pickerTarget: null, bodyDate: null, pain: null, trendEx: null };
 
 function getSessions(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_SESSIONS)||'[]'); }catch(e){ return []; } }
 function saveSessions(list){ localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list)); }
@@ -923,12 +936,118 @@ function lineChartSVG(data, unit, color){
   </svg>`;
 }
 
+/* ===== 週次ボリューム / 1RM推移 ===== */
+function weekStart(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() - d.getDay()); // 日曜始まり
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function weeklyVolume(weeksBack){
+  const sessions = getSessions().filter(s=>s.type!=='cardio' && s.date);
+  const thisWeek = weekStart(todayStr());
+  const target = new Date(thisWeek + 'T00:00:00');
+  target.setDate(target.getDate() - weeksBack*7);
+  const wk = target.getFullYear() + '-' + String(target.getMonth()+1).padStart(2,'0') + '-' + String(target.getDate()).padStart(2,'0');
+  const byPart = {};
+  let sessionCount = 0;
+  sessions.forEach(s=>{
+    if(weekStart(s.date) !== wk) return;
+    sessionCount++;
+    (s.exercises||[]).forEach(e=>{
+      const work = (e.sets||[]).filter(x=>!x.warmup).length;
+      if(!work) return;
+      const p = bodyPartOf(e.name);
+      byPart[p] = (byPart[p]||0) + work;
+    });
+  });
+  return { week: wk, byPart, sessionCount };
+}
+
+function weeklyVolumeText(){
+  const cur = weeklyVolume(0), prev = weeklyVolume(1);
+  const parts = BODY_PART_ORDER.filter(p=>p!=='その他');
+  const fmt = v => parts.map(p=>`${p}${v.byPart[p]||0}`).join(' ');
+  if(cur.sessionCount === 0 && prev.sessionCount === 0) return '';
+  return `【週あたりの部位別セット数（本番セットのみ）】\n今週(${cur.week}〜) 筋トレ${cur.sessionCount}回: ${fmt(cur)}\n前週 筋トレ${prev.sessionCount}回: ${fmt(prev)}\n筋肥大の目安は週10〜20セット/部位です。直近2週で明らかにセット数が不足している部位があれば、次回メニューでその部位を優先し、評価コメントでも指摘してください。`;
+}
+
+function renderWeeklyVolumeCard(){
+  const cur = weeklyVolume(0);
+  const prev = weeklyVolume(1);
+  const parts = BODY_PART_ORDER.filter(p=>p!=='その他');
+  const maxVal = Math.max(10, ...parts.map(p=>cur.byPart[p]||0));
+  let rows = parts.map(p=>{
+    const v = cur.byPart[p] || 0;
+    const pv = prev.byPart[p] || 0;
+    // 筋肥大の目安は週10〜20セット
+    const cls = v === 0 ? '' : (v < 10 ? ' low' : (v <= 20 ? ' good' : ' over'));
+    return `<div class="vol-row">
+      <span class="vol-part">${p}</span>
+      <span class="vol-bar"><span class="vol-fill${cls}" style="width:${Math.min(100, v/maxVal*100)}%"></span></span>
+      <span class="vol-num${cls}">${v}<span class="vol-prev">（前週${pv}）</span></span>
+    </div>`;
+  }).join('');
+  return `<div class="card">
+    <h2>📊 今週の部位別セット数</h2>
+    <div class="sub" style="margin-bottom:10px">${cur.week} の週 / 筋トレ${cur.sessionCount}回。本番セットのみ集計。筋肥大の目安は<b>週10〜20セット</b>です。</div>
+    ${rows}
+    <div class="vol-legend"><span class="dot vol-dot-low"></span>10未満（不足）　<span class="dot vol-dot-good"></span>10〜20（適正）　<span class="dot vol-dot-over"></span>20超</div>
+  </div>`;
+}
+
+function exercise1RMSeries(name){
+  return getSessions()
+    .filter(s=>s.type!=='cardio' && s.date)
+    .sort((a,b)=>a.date.localeCompare(b.date))
+    .map(s=>{
+      const ex = (s.exercises||[]).find(e=>e.name === name);
+      if(!ex) return null;
+      // Epley式で本番セットの最大推定1RMを算出
+      const est = (ex.sets||[]).filter(x=>!x.warmup && x.weight!=null && x.reps!=null)
+        .map(x=>x.weight * (1 + x.reps/30));
+      if(est.length === 0) return null;
+      return { date: s.date, value: +Math.max(...est).toFixed(1) };
+    })
+    .filter(Boolean);
+}
+
+function trackedExerciseNames(){
+  const counts = {};
+  getSessions().filter(s=>s.type!=='cardio').forEach(s=>{
+    (s.exercises||[]).forEach(e=>{
+      const hasLoad = (e.sets||[]).some(x=>!x.warmup && x.weight!=null && x.reps!=null);
+      if(hasLoad) counts[e.name] = (counts[e.name]||0) + 1;
+    });
+  });
+  return Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+}
+
+function render1RMCard(){
+  const names = trackedExerciseNames();
+  if(names.length === 0){
+    return `<div class="card"><h2>🏋️ 推定1RMの推移</h2><div class="sub">重量入りの記録がまだありません。</div></div>`;
+  }
+  if(!state.trendEx || !names.includes(state.trendEx)) state.trendEx = names[0];
+  const series = exercise1RMSeries(state.trendEx);
+  const diff = series.length >= 2 ? +(series[series.length-1].value - series[0].value).toFixed(1) : null;
+  return `<div class="card">
+    <h2>🏋️ 推定1RMの推移</h2>
+    <select id="trendExSelect" class="rpe-select" style="width:100%;margin-bottom:10px">
+      ${names.map(n=>`<option value="${escapeAttr(n)}"${n===state.trendEx?' selected':''}>${escapeHtml(n)}</option>`).join('')}
+    </select>
+    ${lineChartSVG(series, 'kg', '#22c55e')}
+    ${diff!=null ? `<div class="sub" style="margin-top:8px">${series[0].date} から ${diff>0?'+':''}${diff}kg</div>` : ''}
+  </div>`;
+}
+
 function renderTrends(){
   const logs = getBodyLogs().slice().sort((a,b)=>a.date.localeCompare(b.date));
   const weight = logs.filter(b=>b.weight!=null).map(b=>({date:b.date, value:b.weight}));
   const fat = logs.filter(b=>b.fat!=null).map(b=>({date:b.date, value:b.fat}));
 
-  let html = `<div class="card">
+  let html = renderWeeklyVolumeCard() + render1RMCard();
+  html += `<div class="card">
     <h2>⚖️ 体重</h2>
     ${lineChartSVG(weight, 'kg', '#f97316')}
     ${weight.length>=2 ? `<div class="sub" style="margin-top:8px">${weight[0].date} から ${(+(weight[weight.length-1].value - weight[0].value).toFixed(1))}kg</div>` : ''}
@@ -1624,6 +1743,9 @@ function bindEvents(){
     };
   });
 
+  const trendExSelect = document.getElementById('trendExSelect');
+  if(trendExSelect) trendExSelect.onchange = ()=>{ state.trendEx = trendExSelect.value; render(); };
+
   const bodyDate = document.getElementById('bodyDate');
   if(bodyDate) bodyDate.onchange = ()=>{ state.bodyDate = bodyDate.value; };
 
@@ -2064,6 +2186,7 @@ ${workoutText}`
 ${getCondition()}
 腹筋(アブドミナル、ロータリートルソー等)は自宅で別途鍛えているため、ジムでの提案は控えめにしてください（must_exercisesには含めず、optional_exercisesに含める場合も1種目までにする）。
 ${bodyTrendText()}
+${weeklyVolumeText()}
 
 【3分割ローテーション】
 次回メニューのfocus/categoryは、必ず以下の3カテゴリのいずれか1つにしてください。
