@@ -1644,10 +1644,16 @@ function buildPrompt(gymId, cardio, workoutText){
       if(s.type==='cardio'){
         return `${s.date}: 有酸素のみ（${CARDIO_LABELS[s.cardio]||s.cardio}）、筋トレなし`;
       }
-      const names = (s.exercises||[]).map(e=>e.name).join('、');
+      const detail = (s.exercises||[]).map(e=>{
+        // 本番セットの「重量×回数」を並べる（アップは漸進性の判断に不要なので除く）
+        const work = (e.sets||[]).filter(x=>!x.warmup)
+          .map(x=>`${x.weight==null?'自重':x.weight+'kg'}×${x.reps==null?'?':x.reps}`)
+          .join(', ');
+        return `${e.name} ${work}${e.maxRM?`（推定1RM ${e.maxRM}kg）`:''}`;
+      }).join(' / ');
       const cat = s.next_menu && s.next_menu.category ? s.next_menu.category : '不明';
       const cardioLabel = CARDIO_LABELS[s.cardio] || '記録なし';
-      return `${s.date}: [${names}] 前回提案カテゴリ=${cat} / その日の有酸素=${cardioLabel} / 評価メモ: ${(s.evaluation||'').slice(0,80)}`;
+      return `${s.date} [${cat}] 有酸素=${cardioLabel}\n    ${detail}\n    評価メモ: ${(s.evaluation||'').slice(0,100)}`;
     }).join('\n');
   }
   const gymName = GYM_NAMES[gymId];
@@ -1672,8 +1678,9 @@ ${getCondition()}
 - "Legs+": 三角筋中部・脚・その他
 直近のセッション履歴にある「前回提案カテゴリ」を参照し、同じカテゴリが連続しないよう、バランスよくローテーションしてください。
 
-【直近のセッション履歴（参考・漸進性とローテーション判断に使用）】
+【直近のセッション履歴（各種目は本番セットの「重量×回数」を時系列で記載）】
 ${historyText}
+上記の過去の重量・回数を必ず参照し、次回メニューのtargetには「前回○kgだったので今回は△kg」と具体的な重量を提示してください。同じ種目を過去にやっている場合は、その実績から漸進的に負荷を上げる（伸びていなければ据え置き・回数で調整する）判断をしてください。評価コメントでも、前回の同一種目と比較した増減に言及してください。
 
 【今日の有酸素運動】${cardioLabel}
 ランニングをした日は脚トレを行わない方針です。今日ランニングをしている場合、今回のトレーニング内容に脚種目が含まれていれば評価コメントで軽く触れてください。また、次回メニューのカテゴリが"Legs+"になる場合は、notesに必ず「ランニングをする予定の日は脚トレを避けてください」という趣旨の注意を含めてください。
