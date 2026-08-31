@@ -1922,12 +1922,12 @@ function bindEvents(){
   if(btnParse) btnParse.onclick = ()=>{
     const raw = document.getElementById('inputPaste').value;
     try{
-      const result = parseClaudeJson(raw);
+      const result = validateResult(parseClaudeJson(raw));
       state.pendingResult = result;
       state.error = null;
       render();
     }catch(e){
-      state.error = '解析に失敗しました。貼り付けた内容がJSON形式か確認してください。';
+      state.error = '解析に失敗しました: ' + e.message;
       render();
     }
   };
@@ -2189,10 +2189,75 @@ async function copyToClipboard(text){
   document.body.removeChild(ta);
 }
 
+// 文章やコードフェンスが混ざっていても、最初の完結したJSONオブジェクトを取り出す
+function extractJsonObject(text){
+  const start = text.indexOf('{');
+  if(start === -1) return null;
+  let depth = 0, inStr = false, esc = false;
+  for(let i = start; i < text.length; i++){
+    const c = text[i];
+    if(inStr){
+      if(esc) esc = false;
+      else if(c === '\\') esc = true;
+      else if(c === '"') inStr = false;
+      continue;
+    }
+    if(c === '"') inStr = true;
+    else if(c === '{') depth++;
+    else if(c === '}'){
+      depth--;
+      if(depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+function tidyJson(t){
+  return t
+    .replace(/[“”]/g, '"')          // スマートクォートを直す
+    .replace(/,\s*([}\]])/g, '$1'); // 末尾のカンマを除去
+}
+
 function parseClaudeJson(text){
-  let t = text.trim();
-  t = t.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```\s*$/, '');
-  return JSON.parse(t);
+  const raw = String(text || '').trim();
+  if(!raw) throw new Error('内容が空です');
+
+  const candidates = [];
+  // 1) コードフェンスの中身
+  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if(fence) candidates.push(fence[1].trim());
+  // 2) そのまま
+  candidates.push(raw);
+  // 3) 前後の文章を除いた最初のJSONオブジェクト
+  const extracted = extractJsonObject(fence ? fence[1] : raw) || extractJsonObject(raw);
+  if(extracted) candidates.push(extracted);
+
+  let lastErr = null;
+  for(const c of candidates){
+    for(const attempt of [c, tidyJson(c)]){
+      try{
+        const obj = JSON.parse(attempt);
+        if(obj && typeof obj === 'object' && !Array.isArray(obj)) return obj;
+      }catch(e){ lastErr = e; }
+    }
+  }
+  if(!raw.includes('{')) throw new Error('JSONが見当たりません。Claudeの回答の「{」から「}」までを貼り付けてください');
+  throw new Error('JSONとして読み取れませんでした（回答が途中で切れている可能性があります）');
+}
+
+// 解析できても中身が想定と違う場合に気づけるようにする
+function validateResult(obj){
+  const problems = [];
+  if(!Array.isArray(obj.exercises)) problems.push('exercises');
+  if(!obj.next_menu || typeof obj.next_menu !== 'object') problems.push('next_menu');
+  if(problems.length) throw new Error(`項目が不足しています（${problems.join(', ')}）。プロンプトをコピーし直して、もう一度Claudeに送ってください`);
+  if(!obj.date) obj.date = todayStr();
+  obj.exercises = obj.exercises.map(e=>({
+    name: String(e.name || '種目'),
+    maxRM: (e.maxRM === undefined ? null : e.maxRM),
+    sets: Array.isArray(e.sets) ? e.sets : []
+  }));
+  return obj;
 }
 
 function buildPrompt(gymId, cardio, workoutText, pain){
