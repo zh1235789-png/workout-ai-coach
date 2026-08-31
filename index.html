@@ -188,6 +188,9 @@ const LS_KEY_GYM_EQUIP_1 = 'wac_gym_equip_1';
 const LS_KEY_GYM_EQUIP_2 = 'wac_gym_equip_2';
 const LS_KEY_LAST_GYM = 'wac_last_gym';
 const LS_KEY_CUSTOM_EX = 'wac_custom_exercises';
+const LS_KEY_BODY = 'wac_body';
+const LS_KEY_LAST_BACKUP = 'wac_last_backup';
+const BACKUP_KEYS = [LS_KEY_SESSIONS, LS_KEY_CONDITION, LS_KEY_GYM_EQUIP_1, LS_KEY_GYM_EQUIP_2, LS_KEY_LAST_GYM, LS_KEY_CUSTOM_EX, LS_KEY_BODY];
 const DEFAULT_CONDITION = '左ハムストリング肉離れ(2026-07-04受傷)からリハビリ中。脚トレは控えめ・痛みが出ない範囲で漸進的に。目的は健康維持・筋力向上・体脂肪率の低下。筋トレ週3-4回、有酸素運動(ランニング・ウォーキング)週3-4回。';
 
 const GYM_NAMES = { '1': 'エニタイムフィットネス志村坂上店', '2': 'エニタイムフィットネス文京本郷店（本郷三丁目）' };
@@ -508,6 +511,11 @@ function bodyPartOf(name){
   for(const r of BODY_PART_RULES){ if(r.re.test(name)) return r.part; }
   return 'その他';
 }
+
+function getBodyLogs(){
+  try{ return JSON.parse(localStorage.getItem(LS_KEY_BODY) || '[]'); }catch(e){ return []; }
+}
+function saveBodyLogs(list){ localStorage.setItem(LS_KEY_BODY, JSON.stringify(list)); }
 
 function getCustomExercises(){
   try{ return JSON.parse(localStorage.getItem(LS_KEY_CUSTOM_EX) || '[]'); }catch(e){ return []; }
@@ -1193,7 +1201,121 @@ function renderSettings(){
     <button class="btn btn-ghost" id="btnResetEquip">初期リストに戻す</button>
     <div id="equipSaved" class="center-msg" style="display:none;color:var(--ok)">✓ 保存しました</div>
   </div>
-  ${renderCustomExCard()}`;
+  ${renderCustomExCard()}
+  ${renderBackupCard()}`;
+}
+
+/* ===== バックアップ / 復元 ===== */
+function buildBackupJson(){
+  const payload = { app:'workout-ai-coach', version:1, exportedAt:new Date().toISOString(), data:{} };
+  BACKUP_KEYS.forEach(k=>{
+    const v = localStorage.getItem(k);
+    if(v != null) payload.data[k] = v;
+  });
+  return JSON.stringify(payload, null, 2);
+}
+
+function markBackedUp(){ localStorage.setItem(LS_KEY_LAST_BACKUP, todayStr()); }
+
+function daysSinceBackup(){
+  const last = localStorage.getItem(LS_KEY_LAST_BACKUP);
+  if(!last) return null;
+  const diff = (new Date(todayStr()) - new Date(last)) / 86400000;
+  return isNaN(diff) ? null : Math.round(diff);
+}
+
+async function exportBackup(){
+  const json = buildBackupJson();
+  const name = `workout-backup-${todayStr()}.json`;
+  const file = new File([json], name, { type:'application/json' });
+  if(navigator.canShare && navigator.canShare({ files:[file] })){
+    try{
+      await navigator.share({ files:[file] });
+      markBackedUp();
+      return '共有シートから保存先を選んでください';
+    }catch(err){
+      if(err && err.name === 'AbortError') return null;
+    }
+  }
+  const url = URL.createObjectURL(new Blob([json], { type:'application/json' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 3000);
+  markBackedUp();
+  return 'ファイルを書き出しました';
+}
+
+function parseBackup(text){
+  const parsed = JSON.parse(text);
+  if(!parsed || parsed.app !== 'workout-ai-coach' || !parsed.data){
+    throw new Error('このアプリのバックアップではありません');
+  }
+  return parsed;
+}
+
+function restoreBackup(text, mode){
+  const parsed = parseBackup(text);
+  const d = parsed.data;
+  if(mode === 'replace'){
+    BACKUP_KEYS.forEach(k=>{
+      if(d[k] != null) localStorage.setItem(k, d[k]);
+      else localStorage.removeItem(k);
+    });
+    return '置き換えました';
+  }
+  // マージ: 記録はid重複を除いて追加、設定は未設定の項目のみ取り込む
+  let added = 0;
+  if(d[LS_KEY_SESSIONS]){
+    const incoming = JSON.parse(d[LS_KEY_SESSIONS]);
+    const current = getSessions();
+    const ids = new Set(current.map(s=>s.id));
+    incoming.forEach(s=>{ if(!ids.has(s.id)){ current.push(s); ids.add(s.id); added++; } });
+    current.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    saveSessions(current);
+  }
+  if(d[LS_KEY_BODY]){
+    const incoming = JSON.parse(d[LS_KEY_BODY]);
+    const current = getBodyLogs();
+    const keys = new Set(current.map(b=>b.date));
+    incoming.forEach(b=>{ if(!keys.has(b.date)){ current.push(b); keys.add(b.date); } });
+    current.sort((a,b)=>a.date.localeCompare(b.date));
+    saveBodyLogs(current);
+  }
+  if(d[LS_KEY_CUSTOM_EX]){
+    const incoming = JSON.parse(d[LS_KEY_CUSTOM_EX]);
+    const merged = Array.from(new Set(getCustomExercises().concat(incoming)));
+    saveCustomExercises(merged);
+  }
+  [LS_KEY_CONDITION, LS_KEY_GYM_EQUIP_1, LS_KEY_GYM_EQUIP_2].forEach(k=>{
+    if(d[k] != null && localStorage.getItem(k) == null) localStorage.setItem(k, d[k]);
+  });
+  return `${added}件の記録を追加しました`;
+}
+
+function renderBackupCard(){
+  const days = daysSinceBackup();
+  const sessions = getSessions();
+  let warn = '';
+  if(days === null){
+    warn = `<div class="err-box">まだ一度もバックアップしていません。この端末のデータが消えると記録は復元できません。</div>`;
+  } else if(days >= 14){
+    warn = `<div class="menu-notes" style="margin-top:0;margin-bottom:12px">⚠️ 最後のバックアップから${days}日経過しています。</div>`;
+  }
+  return `<div class="card">
+    <h2>💾 データのバックアップ</h2>
+    ${warn}
+    <div class="sub" style="margin-bottom:10px">記録はこの端末のブラウザ内にのみ保存されています。サイトデータの削除や機種変更で消えるため、定期的に書き出してください。<br>現在の記録: トレーニング${sessions.length}件 / 体組成${getBodyLogs().length}件${days!==null?` ／ 最終バックアップ: ${escapeHtml(localStorage.getItem(LS_KEY_LAST_BACKUP))}`:''}</div>
+    <button class="btn btn-primary" id="btnBackupExport">バックアップを書き出す</button>
+    <button class="btn btn-ghost" id="btnBackupCopy">バックアップをコピー</button>
+    <div class="field" style="margin-top:14px;margin-bottom:8px">
+      <label>復元（バックアップの中身を貼り付け）</label>
+      <textarea id="inputRestore" placeholder='{"app":"workout-ai-coach", ...}'></textarea>
+    </div>
+    <button class="btn btn-secondary" id="btnRestoreMerge">追加で復元（今の記録を残す）</button>
+    <button class="btn btn-ghost" id="btnRestoreReplace">置き換えて復元（今の記録を消す）</button>
+    <div id="backupMsg" class="center-msg" style="display:none"></div>
+  </div>`;
 }
 
 function renderCustomExCard(){
@@ -1255,6 +1377,48 @@ function bindEvents(){
       render();
     }
   };
+
+  const showBackupMsg = (text, ok)=>{
+    const el = document.getElementById('backupMsg');
+    if(!el) return;
+    el.textContent = text;
+    el.style.color = ok ? 'var(--ok)' : 'var(--danger)';
+    el.style.display = 'block';
+  };
+
+  const btnBackupExport = document.getElementById('btnBackupExport');
+  if(btnBackupExport) btnBackupExport.onclick = async ()=>{
+    try{
+      const msg = await exportBackup();
+      if(msg) { render(); showBackupMsg('✓ ' + msg, true); }
+    }catch(err){ showBackupMsg('書き出しに失敗しました: ' + err.message, false); }
+  };
+
+  const btnBackupCopy = document.getElementById('btnBackupCopy');
+  if(btnBackupCopy) btnBackupCopy.onclick = async ()=>{
+    try{
+      await copyToClipboard(buildBackupJson());
+      markBackedUp();
+      render();
+      showBackupMsg('✓ コピーしました。メモアプリ等に貼り付けて保管してください', true);
+    }catch(err){ showBackupMsg('コピーに失敗しました: ' + err.message, false); }
+  };
+
+  const doRestore = (mode)=>{
+    const text = document.getElementById('inputRestore').value.trim();
+    if(!text){ showBackupMsg('復元するバックアップを貼り付けてください', false); return; }
+    if(mode === 'replace' && !confirm('今の記録をすべて消して、貼り付けた内容に置き換えます。よろしいですか？')) return;
+    try{
+      const msg = restoreBackup(text, mode);
+      state.entryRows = null; state.entryRowsFromMenu = false;
+      render();
+      showBackupMsg('✓ ' + msg, true);
+    }catch(err){ showBackupMsg('復元に失敗しました: ' + err.message, false); }
+  };
+  const btnRestoreMerge = document.getElementById('btnRestoreMerge');
+  if(btnRestoreMerge) btnRestoreMerge.onclick = ()=> doRestore('merge');
+  const btnRestoreReplace = document.getElementById('btnRestoreReplace');
+  if(btnRestoreReplace) btnRestoreReplace.onclick = ()=> doRestore('replace');
 
   document.querySelectorAll('.custom-del').forEach(b=>{
     b.onclick = ()=>{
