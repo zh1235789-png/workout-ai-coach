@@ -246,7 +246,7 @@ const DEFAULT_EQUIP_2 = `【マシン種目(PRECOR製)】チェストプレス�
 【保有器具】パワーラック(3台)、スミスマシン、ケーブルマシン、ダンベル、ベンチ、ストレッチエリア、体組成計
 【有酸素(PRECOR製)】トレッドミル(8台)、クロストレーナー(2台)、リカンベントバイク(2台)、アップライトバイク(2台)`;
 
-let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null, pickerTarget: null, bodyDate: null, pain: null, trendEx: null, cardioMin: null, cardioKm: null, filterDate: null };
+let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null, pickerTarget: null, bodyDate: null, pain: null, trendEx: null, cardioMin: null, cardioKm: null, filterDate: null, bodyWeight: null, bodyFat: null, pasteText: null };
 
 function getSessions(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_SESSIONS)||'[]'); }catch(e){ return []; } }
 function saveSessions(list){ localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list)); }
@@ -258,7 +258,8 @@ function switchTab(tab){
   state.tab = tab;
   state.pendingResult = null; state.error = null; state.viewingSession = null; state.filterDate = null; state.cardio = null; state.cardioLogDate = null; state.cardioMin = null; state.cardioKm = null;
   state.entryRows = null; state.entryRowsFromMenu = false; state.shareImage = null; state.editDraft = null; state.pain = null;
-  render();
+  state.bodyWeight = null; state.bodyFat = null; state.pasteText = null;
+  render({ skipCapture: true });
 }
 
 function getLastStrengthSession(){
@@ -331,7 +332,7 @@ function formatWarmupHint(w){
 
 function collectEntryRows(){
   const rows = [];
-  document.querySelectorAll('.entry-row').forEach(el=>{
+  document.querySelectorAll('#entryRows .entry-row').forEach(el=>{
     const sets = [];
     el.querySelectorAll('.set-row').forEach(sEl=>{
       sets.push({
@@ -372,7 +373,21 @@ function entryRowsToText(rows){
   }).join('\n');
 }
 
-function render(){
+// 再描画でDOMが作り直されるため、入力途中の値を先にstateへ退避する
+function capturePendingInputs(){
+  if(document.querySelector('#entryRows .entry-row')) state.entryRows = collectEntryRows();
+  const grab = (id, key)=>{ const el = document.getElementById(id); if(el) state[key] = el.value; };
+  grab('cardioMin', 'cardioMin');
+  grab('cardioKm', 'cardioKm');
+  grab('inputCardioDate', 'cardioLogDate');
+  grab('bodyDate', 'bodyDate');
+  grab('bodyWeight', 'bodyWeight');
+  grab('bodyFat', 'bodyFat');
+  grab('inputPaste', 'pasteText');
+}
+
+function render(opts){
+  if(!(opts && opts.skipCapture)) capturePendingInputs();
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('sel', b.dataset.tab===state.tab));
   const app = document.getElementById('app');
   if(state.tab==='home') app.innerHTML = renderHome();
@@ -497,7 +512,7 @@ function renderHome(){
   html += `<div class="card">
     <h2><span class="step-num">2</span> Claudeの回答を貼り付け</h2>
     <div class="sub" style="margin-bottom:8px">Claudeが返したJSON形式の回答をそのまま貼り付けてください。</div>
-    <textarea id="inputPaste" placeholder='{"date": "...", "exercises": [...], ...}'></textarea>
+    <textarea id="inputPaste" placeholder='{"date": "...", "exercises": [...], ...}'>${escapeHtml(state.pasteText||'')}</textarea>
     <button class="btn btn-primary" id="btnParse" style="margin-top:10px">貼り付けた内容を解析</button>`;
   if(state.error){
     html += `<div class="err-box" style="margin-top:12px">${escapeHtml(state.error)}</div>`;
@@ -914,8 +929,8 @@ function renderBodyInputCard(){
     ${summary}
     <div class="body-row" style="margin-top:10px">
       <input type="date" id="bodyDate" value="${escapeAttr(state.bodyDate)}">
-      <input type="number" id="bodyWeight" placeholder="体重kg" inputmode="decimal" step="0.1">
-      <input type="number" id="bodyFat" placeholder="体脂肪%" inputmode="decimal" step="0.1">
+      <input type="number" id="bodyWeight" placeholder="体重kg" inputmode="decimal" step="0.1" value="${escapeAttr(state.bodyWeight||'')}">
+      <input type="number" id="bodyFat" placeholder="体脂肪%" inputmode="decimal" step="0.1" value="${escapeAttr(state.bodyFat||'')}">
     </div>
     <button class="btn btn-secondary" id="btnSaveBody" style="margin-top:10px">体組成を記録</button>
     <div id="bodySaved" class="center-msg" style="display:none;color:var(--ok)">✓ 記録しました</div>
@@ -1810,7 +1825,8 @@ function bindEvents(){
     logs.sort((a,b)=>a.date.localeCompare(b.date));
     saveBodyLogs(logs);
     state.error = null;
-    render();
+    state.bodyWeight = null; state.bodyFat = null;
+    render({ skipCapture: true });
     const msg = document.getElementById('bodySaved');
     if(msg){ msg.style.display='block'; setTimeout(()=>{ msg.style.display='none'; }, 1800); }
   };
@@ -1930,7 +1946,8 @@ function bindEvents(){
       const result = validateResult(parseClaudeJson(raw));
       state.pendingResult = result;
       state.error = null;
-      render();
+      state.pasteText = null;
+      render({ skipCapture: true });
     }catch(e){
       state.error = '解析に失敗しました: ' + e.message;
       render();
