@@ -107,6 +107,10 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 .rpe-row{display:flex;align-items:center;gap:8px;margin-top:8px}
 .rpe-label{font-size:11.5px;color:var(--sub);font-weight:600;flex-shrink:0}
 .rpe-select{flex:1;min-width:0;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:16px;font-family:inherit}
+.today-cardio{margin-top:12px;border-top:1px solid var(--border);padding-top:10px}
+.today-cardio-head{font-size:11.5px;color:var(--sub);font-weight:700;margin-bottom:6px}
+.today-cardio-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;padding:5px 0}
+.cardio-del{background:transparent;border:1px solid var(--border);color:var(--sub);border-radius:8px;width:30px;height:30px;font-size:12px;flex-shrink:0;cursor:pointer}
 /* pain score */
 .pain-row{display:flex;gap:3px}
 .pain-btn{flex:1;min-width:0;padding:9px 0;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:12px;font-weight:700;cursor:pointer}
@@ -414,8 +418,8 @@ function renderHome(){
 
   if(state.cardioLogDate===null || state.cardioLogDate===undefined) state.cardioLogDate = todayStr();
   html += `<div class="card">
-    <h2>🏃 今日の有酸素運動</h2>
-    <div class="sub" style="margin-bottom:8px">筋トレと同じ日に走った/歩いたかを選んでください。プロンプトに含まれ、次回メニューの判断にも使われます。</div>
+    <h2>🏃 有酸素運動を記録</h2>
+    <div class="sub" style="margin-bottom:8px">筋トレとは別の記録として保存されます。筋トレと同じ日でも、有酸素だけの日でも、そのまま記録してください。</div>
     <div class="seg">
       <button data-cardio="none" class="cardio-btn${state.cardio==='none'?' sel':''}">なし</button>
       <button data-cardio="walk" class="cardio-btn${state.cardio==='walk'?' sel':''}">ウォーキング</button>
@@ -426,11 +430,12 @@ function renderHome(){
       <input type="number" id="cardioKm" placeholder="距離（km）" inputmode="decimal" step="0.1" value="${escapeAttr(state.cardioKm||'')}">
     </div>
     <div class="field" style="margin-top:10px;margin-bottom:0">
-      <label>筋トレなしで有酸素だけ記録したい日</label>
+      <label>日付</label>
       <input type="date" id="inputCardioDate" value="${escapeAttr(state.cardioLogDate)}">
     </div>
-    <button class="btn btn-secondary" id="btnLogCardioOnly" style="margin-top:10px">この内容だけ記録する（筋トレなし）</button>
+    <button class="btn btn-secondary" id="btnLogCardio" style="margin-top:10px">有酸素を記録</button>
     <div id="cardioLogSaved" class="center-msg" style="display:none;color:var(--ok)">✓ 記録しました</div>
+    ${renderTodayCardioList()}
   </div>`;
 
   if(state.pain === null || state.pain === undefined) state.pain = 0;
@@ -891,6 +896,33 @@ function painTrendText(){
     .slice(-5);
   if(recent.length === 0) return '';
   return `\n【左ハムの痛み推移（0=なし〜10=最大）】${recent.map(s=>`${s.date}:${s.pain}`).join(' → ')}`;
+}
+
+// その日の有酸素記録をまとめる（旧形式で筋トレ記録に付いていたものも拾う）
+function cardioEntriesForDate(date){
+  return getSessions().filter(x=>x.date === date && x.cardio && x.cardio !== 'none');
+}
+
+function cardioSummaryForDate(date){
+  const list = cardioEntriesForDate(date);
+  if(list.length === 0) return null;
+  const kind = list.some(x=>x.cardio === 'run') ? 'run' : 'walk';
+  const sum = (key)=>{
+    const vals = list.map(x=>x[key]).filter(v=>v != null);
+    return vals.length ? vals.reduce((a,b)=>a+b, 0) : null;
+  };
+  return { cardio: kind, cardioMin: sum('cardioMin'), cardioKm: sum('cardioKm'), count: list.length };
+}
+
+function renderTodayCardioList(){
+  const date = state.cardioLogDate || todayStr();
+  const list = cardioEntriesForDate(date);
+  if(list.length === 0) return '';
+  const rows = list.map(x=>
+    `<div class="today-cardio-row"><span>${x.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}${escapeHtml(cardioDetailLabel(x))}</span>`
+    + `<button class="cardio-del" data-id="${escapeAttr(x.id)}" title="削除">✕</button></div>`
+  ).join('');
+  return `<div class="today-cardio"><div class="today-cardio-head">${escapeHtml(date)} の有酸素記録</div>${rows}</div>`;
 }
 
 function cardioDetailLabel(s){
@@ -1405,7 +1437,7 @@ function renderHistory(){
     const s = state.viewingSession;
     let html = `<div class="card"><span class="detail-close" id="btnCloseDetail">閉じる ✕</span><div style="clear:both"></div></div>`;
     if(s.type==='cardio'){
-      html += `<div class="card"><h2>${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}${escapeHtml(cardioDetailLabel(s))}</h2><div class="sub">${escapeHtml(s.date||'')}（筋トレなし・有酸素のみの記録）</div></div>`;
+      html += `<div class="card"><h2>${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}${escapeHtml(cardioDetailLabel(s))}</h2><div class="sub">${escapeHtml(s.date||'')}　有酸素運動の記録</div></div>`;
       html += renderShareCard();
     } else {
       html += renderResult(s, false);
@@ -1433,7 +1465,7 @@ function renderHistory(){
     const cardioIcon = s.cardio==='run' ? '🏃' : (s.cardio==='walk' ? '🚶' : '');
     let summary;
     if(s.type==='cardio'){
-      summary = escapeHtml(`${s.cardio==='run'?'ランニング':'ウォーキング'}${cardioDetailLabel(s)}のみ（筋トレなし）`);
+      summary = escapeHtml(`有酸素: ${s.cardio==='run'?'ランニング':'ウォーキング'}${cardioDetailLabel(s)}`);
     } else {
       const names = (s.exercises||[]).map(e=>e.name).join('、');
       const nextFocus = s.next_menu ? `　→次回: ${s.next_menu.focus||''}` : '';
@@ -1705,10 +1737,18 @@ function bindEvents(){
   if(cardioKm) cardioKm.oninput = ()=>{ state.cardioKm = cardioKm.value; };
 
   const inputCardioDate = document.getElementById('inputCardioDate');
-  if(inputCardioDate) inputCardioDate.onchange = ()=>{ state.cardioLogDate = inputCardioDate.value; };
+  if(inputCardioDate) inputCardioDate.onchange = ()=>{ state.cardioLogDate = inputCardioDate.value; render(); };
 
-  const btnLogCardioOnly = document.getElementById('btnLogCardioOnly');
-  if(btnLogCardioOnly) btnLogCardioOnly.onclick = ()=>{
+  document.querySelectorAll('.cardio-del').forEach(b=>{
+    b.onclick = ()=>{
+      if(!confirm('この有酸素の記録を削除しますか？')) return;
+      saveSessions(getSessions().filter(x=>x.id !== b.dataset.id));
+      render();
+    };
+  });
+
+  const btnLogCardio = document.getElementById('btnLogCardio');
+  if(btnLogCardio) btnLogCardio.onclick = ()=>{
     if(state.cardio==='none'){
       state.error = '「なし」以外（ウォーキング or ランニング）を選んでから記録してください。';
       render();
@@ -1726,10 +1766,16 @@ function bindEvents(){
         cardioKm: numOrNull(state.cardioKm)
       };
       sessions.push(entry);
+      sessions.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
       saveSessions(sessions);
+      // 続けて押しても二重に登録されないよう、有酸素の入力だけリセットする
+      // （筋トレの入力を退避してから、有酸素だけを消して再描画する）
+      capturePendingInputs();
+      state.cardio = 'none'; state.cardioMin = null; state.cardioKm = null;
+      state.error = null;
+      render({ skipCapture: true });
       const msg = document.getElementById('cardioLogSaved');
-      msg.style.display = 'block';
-      setTimeout(()=>{ msg.style.display = 'none'; }, 1800);
+      if(msg){ msg.style.display = 'block'; setTimeout(()=>{ msg.style.display = 'none'; }, 1800); }
     }catch(err){
       state.error = '記録に失敗しました: ' + err.message;
       render();
@@ -1960,10 +2006,7 @@ function bindEvents(){
       const sessions = getSessions();
       const result = state.pendingResult;
       result.id = Date.now().toString();
-      result.cardio = state.cardio || 'none';
       result.pain = state.pain != null ? state.pain : null;
-      result.cardioMin = numOrNull(state.cardioMin);
-      result.cardioKm = numOrNull(state.cardioKm);
       rememberExerciseNames((result.exercises||[]).map(e=>e.name));
       sessions.push(result);
       saveSessions(sessions);
@@ -2304,9 +2347,10 @@ function buildPrompt(gymId, cardio, workoutText, pain){
   }
   const gymName = GYM_NAMES[gymId];
   const gymEquip = getGymEquip(gymId);
-  const cardioLabel = CARDIO_LABELS[cardio] || 'なし';
+  const cardioLabel = CARDIO_LABELS[(cardioSummaryForDate(todayStr()) || {}).cardio] || 'なし';
   const painLabel = (pain != null) ? String(pain) : '未記録';
-  const cardioAmountLabel = cardioDetailLabel({ cardioMin: numOrNull(state.cardioMin), cardioKm: numOrNull(state.cardioKm) });
+  const todayCardio = cardioSummaryForDate(todayStr());
+  const cardioAmountLabel = todayCardio ? cardioDetailLabel(todayCardio) : '';
   const intro = workoutText
     ? `あなたは経験豊富なパーソナルトレーナーです。以下の「今日のトレーニング内容」をもとに、評価と次回のトレーニングメニューを提案してください。
 
