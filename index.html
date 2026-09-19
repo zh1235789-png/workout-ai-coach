@@ -111,6 +111,7 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 .today-cardio-head{font-size:11.5px;color:var(--sub);font-weight:700;margin-bottom:6px}
 .today-cardio-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;padding:5px 0}
 .cardio-del{background:transparent;border:1px solid var(--border);color:var(--sub);border-radius:8px;width:30px;height:30px;font-size:12px;flex-shrink:0;cursor:pointer}
+.draft-note{background:var(--accent-soft);color:var(--accent);border-radius:8px;padding:8px 10px;font-size:12.5px;margin-bottom:10px}
 /* pain score */
 .pain-row{display:flex;gap:3px}
 .pain-btn{flex:1;min-width:0;padding:9px 0;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:12px;font-weight:700;cursor:pointer}
@@ -262,11 +263,48 @@ function getGymEquip(id){ return localStorage.getItem(id==='1'?LS_KEY_GYM_EQUIP_
 function getLastGym(){ return localStorage.getItem(LS_KEY_LAST_GYM) || '1'; }
 
 function switchTab(tab){
+  // 記録途中の内容（種目・有酸素・痛み・貼り付け・解析結果）は残し、画面表示の状態だけ戻す
+  capturePendingInputs();
   state.tab = tab;
-  state.pendingResult = null; state.error = null; state.viewingSession = null; state.filterDate = null; state.cardio = null; state.cardioLogDate = null; state.cardioMin = null; state.cardioKm = null;
-  state.entryRows = null; state.entryRowsFromMenu = false; state.shareImage = null; state.editDraft = null; state.pain = null;
-  state.pasteText = null;
+  state.error = null; state.viewingSession = null; state.filterDate = null; state.shareImage = null; state.editDraft = null;
   render({ skipCapture: true });
+}
+
+/* ===== 記録途中の下書き（タブ切替・アプリ終了でも残す） ===== */
+const LS_KEY_DRAFT = 'wac_draft';
+const DRAFT_KEYS = ['entryRows','entryRowsFromMenu','cardio','cardioMin','cardioKm','pain','pasteText','pendingResult'];
+
+function saveDraft(){
+  try{
+    const d = { savedAt: todayStr() };
+    DRAFT_KEYS.forEach(k=>{ d[k] = state[k]; });
+    localStorage.setItem(LS_KEY_DRAFT, JSON.stringify(d));
+  }catch(e){ /* 保存できない環境では下書きなしで動かす */ }
+}
+
+function clearDraft(){
+  try{ localStorage.removeItem(LS_KEY_DRAFT); }catch(e){}
+  DRAFT_KEYS.forEach(k=>{ state[k] = (k === 'entryRowsFromMenu') ? false : null; });
+  state.draftRestoredAt = null;
+}
+
+// 前回メニューを読み込んだだけの行は「入力」とみなさない
+function draftHasContent(d){
+  if(!d) return false;
+  const setUsed = (d.entryRows||[]).some(r=>(r.sets||[]).some(x=>String(x.weight||'')!=='' || String(x.reps||'')!==''));
+  const customRow = !d.entryRowsFromMenu && (d.entryRows||[]).some(r=>(r.name||'').trim());
+  return setUsed || customRow || !!d.pasteText || !!d.pendingResult
+    || d.cardioMin != null && d.cardioMin !== '' || d.cardioKm != null && d.cardioKm !== ''
+    || (d.cardio && d.cardio !== 'none') || (d.pain != null && d.pain > 0);
+}
+
+function loadDraft(){
+  try{
+    const d = JSON.parse(localStorage.getItem(LS_KEY_DRAFT) || 'null');
+    if(!d) return;
+    DRAFT_KEYS.forEach(k=>{ if(d[k] !== undefined) state[k] = d[k]; });
+    if(draftHasContent(d)) state.draftRestoredAt = d.savedAt || null;
+  }catch(e){ /* 壊れた下書きは無視 */ }
 }
 
 function getLastStrengthSession(){
@@ -407,6 +445,7 @@ function render(opts){
   else app.innerHTML = renderSettings();
   refreshExerciseDatalist();
   bindEvents();
+  saveDraft();
 }
 
 function renderHome(){
@@ -474,6 +513,7 @@ function renderHome(){
   if(state.entryRows===null || state.entryRows===undefined) state.entryRows = buildInitialEntryRows();
   html += `<div class="card">
     <h2>🏋️ 今日やった筋トレ</h2>
+    ${state.draftRestoredAt ? `<div class="draft-note">📝 ${escapeHtml(state.draftRestoredAt)} の入力途中の内容を復元しました</div>` : ''}
     <div class="sub" style="margin-bottom:10px">${state.entryRowsFromMenu ? '前回提案したメニューを読み込みました。やった種目に重量・回数を入れてください（空欄の種目は「やらなかった」扱いになります）。' : '種目・重量・回数を入力してください。'}<br>左端のセット番号をタップすると「アップ」に切り替わります。</div>
     <div id="entryRows">`;
   state.entryRows.forEach((r,i)=>{
@@ -511,6 +551,7 @@ function renderHome(){
     <button class="btn btn-secondary" id="btnPickEx" style="margin-top:8px">📋 リストから種目を選ぶ</button>
     <button class="btn btn-ghost" id="btnAddRow" style="margin-top:8px">＋ 空の種目を追加</button>
     <button class="btn btn-secondary" id="btnResetRows" style="margin-top:8px">前回メニューを読み込み直す</button>
+    <button class="btn btn-ghost" id="btnClearDraft" style="margin-top:8px">入力をすべてクリア</button>
   </div>`;
 
   html += `<div class="card">
@@ -1809,6 +1850,13 @@ function bindEvents(){
     commitRows(rows);
   };
 
+  const btnClearDraft = document.getElementById('btnClearDraft');
+  if(btnClearDraft) btnClearDraft.onclick = ()=>{
+    if(!confirm('入力中の筋トレ・有酸素・痛み・貼り付けた内容をすべて消します。よろしいですか？')) return;
+    clearDraft();
+    render({ skipCapture: true });
+  };
+
   const btnResetRows = document.getElementById('btnResetRows');
   if(btnResetRows) btnResetRows.onclick = ()=>{
     commitRows(buildInitialEntryRows());
@@ -1927,7 +1975,7 @@ function bindEvents(){
       if(!check.some(s=>s.id===result.id)){
         throw new Error('保存を確認できませんでした');
       }
-      state.pendingResult = null;
+      clearDraft();
       switchTab('history');
     }catch(err){
       state.error = '保存に失敗しました: ' + err.message + '（プライベートブラウズモードや、ストレージ容量の上限が原因の可能性があります）';
@@ -2341,6 +2389,18 @@ document.getElementById('pickerOverlay').onclick = (e)=>{
   if(e.target.id === 'pickerOverlay') closePicker();
 };
 
+let draftTimer = null;
+const scheduleDraftSave = ()=>{
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(()=>{ capturePendingInputs(); saveDraft(); }, 400);
+};
+document.getElementById('app').addEventListener('input', scheduleDraftSave);
+document.getElementById('app').addEventListener('change', scheduleDraftSave);
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'hidden'){ capturePendingInputs(); saveDraft(); }
+});
+window.addEventListener('pagehide', ()=>{ capturePendingInputs(); saveDraft(); });
+
 document.getElementById('timerToggle').onclick = toggleTimer;
 document.getElementById('timerStop').onclick = stopTimer;
 document.getElementById('timerAdd').onclick = ()=> addTimer(30);
@@ -2363,7 +2423,8 @@ function shiftMonth(ym, delta){
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
 }
 
-render();
+loadDraft();
+render({ skipCapture: true });
 </script>
 </body>
 </html>
