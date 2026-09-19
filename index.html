@@ -381,8 +381,10 @@ function entryRowsToText(rows){
 }
 
 // 再描画でDOMが作り直されるため、入力途中の値を先にstateへ退避する
-function capturePendingInputs(){
-  if(document.querySelector('#entryRows .entry-row')) state.entryRows = collectEntryRows();
+function capturePendingInputs(opts){
+  // 行を並べ替え・削除したボタンは、結果をstateに入れてから再描画する。
+  // そのとき画面上の古い行を読み直すと操作が打ち消されるので、行だけは読まない。
+  if(!(opts && opts.rowsFromState) && document.querySelector('#entryRows .entry-row')) state.entryRows = collectEntryRows();
   const grab = (id, key)=>{ const el = document.getElementById(id); if(el) state[key] = el.value; };
   grab('cardioMin', 'cardioMin');
   grab('cardioKm', 'cardioKm');
@@ -390,8 +392,13 @@ function capturePendingInputs(){
   grab('inputPaste', 'pasteText');
 }
 
+function commitRows(rows){
+  state.entryRows = rows;
+  render({ rowsFromState: true });
+}
+
 function render(opts){
-  if(!(opts && opts.skipCapture)) capturePendingInputs();
+  if(!(opts && opts.skipCapture)) capturePendingInputs(opts);
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('sel', b.dataset.tab===state.tab));
   const app = document.getElementById('app');
   if(state.tab==='home') app.innerHTML = renderHome();
@@ -722,7 +729,7 @@ function pickExercise(name){
     state.entryRows = rows;
   }
   closePicker();
-  render();
+  render({ rowsFromState: true });
 }
 
 /* ===== インターバルタイマー ===== */
@@ -1797,23 +1804,21 @@ function bindEvents(){
 
   const btnAddRow = document.getElementById('btnAddRow');
   if(btnAddRow) btnAddRow.onclick = ()=>{
-    state.entryRows = collectEntryRows();
-    state.entryRows.push(emptyRow());
-    render();
+    const rows = collectEntryRows();
+    rows.push(emptyRow());
+    commitRows(rows);
   };
 
   const btnResetRows = document.getElementById('btnResetRows');
   if(btnResetRows) btnResetRows.onclick = ()=>{
-    state.entryRows = buildInitialEntryRows();
-    render();
+    commitRows(buildInitialEntryRows());
   };
 
   document.querySelectorAll('.entry-del').forEach(b=>{
     b.onclick = ()=>{
       const rows = collectEntryRows();
       rows.splice(parseInt(b.dataset.i,10), 1);
-      state.entryRows = rows.length ? rows : [emptyRow()];
-      render();
+      commitRows(rows.length ? rows : [emptyRow()]);
     };
   });
 
@@ -1841,8 +1846,7 @@ function bindEvents(){
       const rows = collectEntryRows();
       const i = +b.dataset.i;
       if(!moveRow(rows, i, b.classList.contains('row-up') ? i-1 : i+1)) return;
-      state.entryRows = rows;
-      render();
+      commitRows(rows);
     };
   });
 
@@ -1861,8 +1865,7 @@ function bindEvents(){
       const rows = collectEntryRows();
       const set = rows[+b.dataset.i].sets[+b.dataset.j];
       set.warmup = !set.warmup;
-      state.entryRows = rows;
-      render();
+      commitRows(rows);
     };
   });
 
@@ -1870,8 +1873,7 @@ function bindEvents(){
     b.onclick = ()=>{
       const rows = collectEntryRows();
       rows[parseInt(b.dataset.i,10)].sets.push(emptySet());
-      state.entryRows = rows;
-      render();
+      commitRows(rows);
     };
   });
 
@@ -1881,8 +1883,7 @@ function bindEvents(){
       const row = rows[parseInt(b.dataset.i,10)];
       row.sets.splice(parseInt(b.dataset.j,10), 1);
       if(row.sets.length===0) row.sets.push(emptySet());
-      state.entryRows = rows;
-      render();
+      commitRows(rows);
     };
   });
 
