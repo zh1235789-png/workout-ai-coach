@@ -669,6 +669,10 @@ const BODY_PART_RULES = [
 ];
 const BODY_PART_ORDER = ['胸','広背筋','僧帽筋','肩','二頭筋','三頭筋','脚','体幹','その他'];
 // 複合種目で補助的に使う部位は0.5セットとして数える（Pelland 2025 の fractional 方式）
+// 主働筋は BODY_PART_RULES、補助筋はここ。両方に出てくる種目は意図を明記する:
+//   デッドリフト  … 主働=僧帽筋（+脊柱起立筋）、補助=広背筋・脚
+//   ロウ系        … 主働=広背筋、補助=僧帽筋（中部）・二頭筋
+//   ベンチプレス系… 主働=胸、補助=三頭筋・肩（前部）
 const SECONDARY_RULES = [
   { re:/ベンチプレス|チェストプレス|ペクトラル|プッシュアップ|腕立て|ディップ/, parts:['三頭筋','肩'] },
   { re:/ショルダープレス|オーバーヘッドプレス|アーノルド/, parts:['三頭筋'] },
@@ -701,9 +705,10 @@ function getVolumeTargets(){
   return out;
 }
 function saveVolumeTargets(t){ localStorage.setItem(LS_KEY_VOL_TARGETS, JSON.stringify(t)); }
-function volumeClass(part, v){
+// targets を渡せば localStorage の読み直しを避けられる（一覧描画用）
+function volumeClass(part, v, targets){
   if(v === 0) return '';
-  const [lo, hi] = getVolumeTargets()[part] || [10, 20];
+  const [lo, hi] = (targets || getVolumeTargets())[part] || [10, 20];
   return v < lo ? ' low' : (v <= hi ? ' good' : ' over');
 }
 function fmtSets(v){ return Number.isInteger(v) ? String(v) : v.toFixed(1); }
@@ -1093,7 +1098,7 @@ function renderWeeklyVolumeCard(){
   let rows = parts.map(p=>{
     const v = cur.byPart[p] || 0;
     const pv = prev.byPart[p] || 0;
-    const cls = volumeClass(p, v);
+    const cls = volumeClass(p, v, t);
     const [lo, hi] = t[p];
     return `<div class="vol-row">
       <span class="vol-part">${p}</span>

@@ -299,3 +299,20 @@ test('volumeClass() は目標の下限・上限で色を変える', () => {
   assert.equal(a.volumeClass('胸', 20), ' good');
   assert.equal(a.volumeClass('胸', 20.5), ' over');
 });
+
+test('secondaryPartsOf() は複合種目の意図どおりに補助筋を割り当てる', () => {
+  const a = app();
+  // デッドリフトは主働=僧帽筋、補助=広背筋・脚
+  assert.equal(a.bodyPartOf('デッドリフト'), '僧帽筋');
+  assert.deepEqual(norm(a.secondaryPartsOf('デッドリフト')).sort(), ['広背筋','脚']);
+  // スクワットは体幹にも0.5入る
+  assert.deepEqual(norm(a.secondaryPartsOf('バーベルスクワット')), ['体幹']);
+  // ショルダープレスは三頭筋のみ（肩は主働なので除外）
+  assert.deepEqual(norm(a.secondaryPartsOf('ショルダープレス')), ['三頭筋']);
+});
+
+test('volumeClass() は渡した目標表を使う', () => {
+  const a = app();
+  assert.equal(a.volumeClass('胸', 9, { 胸:[8,14] }), ' good');
+  assert.equal(a.volumeClass('胸', 9), ' low');   // 初期値は12〜20
+});
