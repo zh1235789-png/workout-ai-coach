@@ -99,9 +99,13 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 .vol-fill.low{background:#eab308}
 .vol-fill.good{background:#16a34a}
 .vol-fill.over{background:#dc2626}
-.vol-num{width:74px;flex-shrink:0;text-align:right;font-size:12.5px;font-weight:700;color:var(--sub)}
+.vol-num{width:100px;flex-shrink:0;text-align:right;font-size:12.5px;font-weight:700;color:var(--sub)}
 .vol-num.low{color:#eab308}.vol-num.good{color:#16a34a}.vol-num.over{color:#dc2626}
 .vol-prev{font-weight:normal;font-size:10.5px;color:var(--sub)}
+.vol-bar{position:relative}
+.vol-target-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+input[type=number].vol-target{width:64px;flex:0 0 64px;padding:9px 4px;text-align:center}
+.vol-goal{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--sub);opacity:.5}
 .vol-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;font-size:10.5px;color:var(--sub);align-items:center}
 .vol-dot-low{background:#eab308}.vol-dot-good{background:#16a34a}.vol-dot-over{background:#dc2626}
 /* RPE */
@@ -238,7 +242,8 @@ const LS_KEY_LAST_GYM = 'wac_last_gym';
 const LS_KEY_CUSTOM_EX = 'wac_custom_exercises';
 const LS_KEY_BODY = 'wac_body';
 const LS_KEY_LAST_BACKUP = 'wac_last_backup';
-const BACKUP_KEYS = [LS_KEY_SESSIONS, LS_KEY_CONDITION, LS_KEY_GYM_EQUIP_1, LS_KEY_GYM_EQUIP_2, LS_KEY_LAST_GYM, LS_KEY_CUSTOM_EX, LS_KEY_BODY];
+const LS_KEY_VOL_TARGETS = 'wac_vol_targets';
+const BACKUP_KEYS = [LS_KEY_SESSIONS, LS_KEY_CONDITION, LS_KEY_GYM_EQUIP_1, LS_KEY_GYM_EQUIP_2, LS_KEY_LAST_GYM, LS_KEY_CUSTOM_EX, LS_KEY_BODY, LS_KEY_VOL_TARGETS];
 const DEFAULT_CONDITION = '左ハムストリング肉離れ(2026-07-04受傷)からリハビリ中。脚トレは控えめ・痛みが出ない範囲で漸進的に。目的は健康維持・筋力向上・体脂肪率の低下。筋トレ週3-4回、有酸素運動(ランニング・ウォーキング)週3-4回。';
 
 const GYM_NAMES = { '1': 'エニタイムフィットネス志村坂上店', '2': 'エニタイムフィットネス文京本郷店（本郷三丁目）' };
@@ -656,15 +661,52 @@ const BODY_PART_RULES = [
   { part:'二頭筋', re:/カール|バイセップ|プリチャー|コンセントレーション/ },
   { part:'三頭筋', re:/トライセップ|スカルクラッシャー|フレンチプレス|キックバック|プレスダウン|ナロー.*(ベンチ|プッシュアップ|腕立て|ディップ)/ },
   { part:'胸',   re:/チェスト|ペクトラル|フライ|クロスオーバー|ディップ|ベンチプレス|インクライン|デクライン|プッシュアップ|腕立て/ },
-  { part:'背中', re:/プルダウン|ラットプル|ロウ|ロー|チンニング|チンアップ|懸垂|デッドリフト|Tバー|バックエクステンション|背筋|プルオーバー|プルアップ|シュラッグ/ },
+  { part:'僧帽筋', re:/シュラッグ|デッドリフト|ハイプル/ },
+  { part:'広背筋', re:/プルダウン|ラットプル|ロウ|ロー(?!テーション|タリー)|チンニング|チンアップ|懸垂|Tバー|バックエクステンション|背筋|プルオーバー|プルアップ/ },
   // ここまでで決まらなかった腕の種目（バックエクステンション等は先に背中で拾われる）
   { part:'二頭筋', re:/アームカール/ },
   { part:'三頭筋', re:/アーム|エクステンション/ }
 ];
-const BODY_PART_ORDER = ['胸','背中','肩','二頭筋','三頭筋','脚','体幹','その他'];
-// 直接種目だけを数える腕は、複合種目の間接刺激があるぶん下限を低くする
-const VOLUME_MIN = { 二頭筋:6, 三頭筋:6 }, VOLUME_MIN_DEFAULT = 10;
-function volumeMin(part){ return VOLUME_MIN[part] ?? VOLUME_MIN_DEFAULT; }
+const BODY_PART_ORDER = ['胸','広背筋','僧帽筋','肩','二頭筋','三頭筋','脚','体幹','その他'];
+// 複合種目で補助的に使う部位は0.5セットとして数える（Pelland 2025 の fractional 方式）
+const SECONDARY_RULES = [
+  { re:/ベンチプレス|チェストプレス|ペクトラル|プッシュアップ|腕立て|ディップ/, parts:['三頭筋','肩'] },
+  { re:/ショルダープレス|オーバーヘッドプレス|アーノルド/, parts:['三頭筋'] },
+  { re:/ラットプル|プルダウン|チンニング|チンアップ|懸垂|プルアップ/, parts:['二頭筋'] },
+  { re:/ロウ|ロー(?!テーション|タリー)|Tバー/, parts:['二頭筋','僧帽筋'] },
+  { re:/デッドリフト/, parts:['広背筋','脚'] },
+  { re:/スクワット|ランジ|レッグプレス|ハック/, parts:['体幹'] },
+];
+function secondaryPartsOf(name){
+  const primary = bodyPartOf(name);
+  const out = new Set();
+  for(const r of SECONDARY_RULES){ if(r.re.test(name)) r.parts.forEach(p=>{ if(p!==primary) out.add(p); }); }
+  return [...out];
+}
+
+// 週あたりの目標セット数（下限・上限）。編集可。
+// 12〜20セット/週が目安（Baz-Valle 2022）。間接セットを0.5として数えたうえでの値。
+const DEFAULT_VOLUME_TARGETS = {
+  胸:[12,20], 広背筋:[12,20], 僧帽筋:[10,20], 肩:[12,20],
+  二頭筋:[10,20], 三頭筋:[12,22], 脚:[12,20], 体幹:[6,12],
+};
+function getVolumeTargets(){
+  let saved = {};
+  try{ saved = JSON.parse(localStorage.getItem(LS_KEY_VOL_TARGETS) || '{}'); }catch(e){}
+  const out = {};
+  Object.keys(DEFAULT_VOLUME_TARGETS).forEach(p=>{
+    const d = DEFAULT_VOLUME_TARGETS[p], v = saved[p];
+    out[p] = (Array.isArray(v) && v.length===2 && v.every(n=>typeof n==='number' && n>=0)) ? v : d;
+  });
+  return out;
+}
+function saveVolumeTargets(t){ localStorage.setItem(LS_KEY_VOL_TARGETS, JSON.stringify(t)); }
+function volumeClass(part, v){
+  if(v === 0) return '';
+  const [lo, hi] = getVolumeTargets()[part] || [10, 20];
+  return v < lo ? ' low' : (v <= hi ? ' good' : ' over');
+}
+function fmtSets(v){ return Number.isInteger(v) ? String(v) : v.toFixed(1); }
 
 function bodyPartOf(name){
   for(const r of BODY_PART_RULES){ if(r.re.test(name)) return r.part; }
@@ -1026,6 +1068,7 @@ function weeklyVolume(weeksBack){
       if(!work) return;
       const p = bodyPartOf(e.name);
       byPart[p] = (byPart[p]||0) + work;
+      secondaryPartsOf(e.name).forEach(sp=>{ byPart[sp] = (byPart[sp]||0) + work*0.5; });
     });
   });
   return { week: wk, byPart, sessionCount };
@@ -1034,32 +1077,35 @@ function weeklyVolume(weeksBack){
 function weeklyVolumeText(){
   const cur = weeklyVolume(0), prev = weeklyVolume(1);
   const parts = BODY_PART_ORDER.filter(p=>p!=='その他');
-  const fmt = v => parts.map(p=>`${p}${v.byPart[p]||0}`).join(' ');
+  const t = getVolumeTargets();
+  const fmt = v => parts.map(p=>`${p}${fmtSets(v.byPart[p]||0)}`).join(' ');
   if(cur.sessionCount === 0 && prev.sessionCount === 0) return '';
-  return `【週あたりの部位別セット数（本番セットのみ）】\n今週(${cur.week}〜) 筋トレ${cur.sessionCount}回: ${fmt(cur)}\n前週 筋トレ${prev.sessionCount}回: ${fmt(prev)}\n筋肥大の目安は週10〜20セット/部位です。二頭筋・三頭筋は直接種目だけの集計で、ベンチプレスや懸垂による間接的な刺激は含まないため、目安は週6〜20セットとしてください。直近2週で明らかにセット数が不足している部位があれば、次回メニューでその部位を優先し、評価コメントでも指摘してください。`;
+  const goals = parts.map(p=>`${p}${t[p][0]}〜${t[p][1]}`).join(' ');
+  return `【週あたりの部位別セット数】\n今週(${cur.week}〜) 筋トレ${cur.sessionCount}回: ${fmt(cur)}\n前週 筋トレ${prev.sessionCount}回: ${fmt(prev)}\n週の目標セット数: ${goals}\n主働筋を1セット、補助的に使う部位を0.5セットとして数えています（例: ベンチプレス1セット＝胸1・三頭筋0.5・肩0.5）。ウォームアップは含みません。\n直近2週で目標を下回っている部位があれば、次回メニューでその部位を優先し、評価コメントでも指摘してください。減量中は下限付近でも筋量は維持できます。`;
 }
 
 function renderWeeklyVolumeCard(){
   const cur = weeklyVolume(0);
   const prev = weeklyVolume(1);
   const parts = BODY_PART_ORDER.filter(p=>p!=='その他');
-  const maxVal = Math.max(10, ...parts.map(p=>cur.byPart[p]||0));
+  const t = getVolumeTargets();
+  const maxVal = Math.max(10, ...parts.map(p=>Math.max(cur.byPart[p]||0, t[p][1])));
   let rows = parts.map(p=>{
     const v = cur.byPart[p] || 0;
     const pv = prev.byPart[p] || 0;
-    // 筋肥大の目安は週10〜20セット
-    const cls = v === 0 ? '' : (v < volumeMin(p) ? ' low' : (v <= 20 ? ' good' : ' over'));
+    const cls = volumeClass(p, v);
+    const [lo, hi] = t[p];
     return `<div class="vol-row">
       <span class="vol-part">${p}</span>
-      <span class="vol-bar"><span class="vol-fill${cls}" style="width:${Math.min(100, v/maxVal*100)}%"></span></span>
-      <span class="vol-num${cls}">${v}<span class="vol-prev">（前週${pv}）</span></span>
+      <span class="vol-bar"><span class="vol-fill${cls}" style="width:${Math.min(100, v/maxVal*100)}%"></span><span class="vol-goal" style="left:${Math.min(100, lo/maxVal*100)}%"></span></span>
+      <span class="vol-num${cls}">${fmtSets(v)}<span class="vol-prev">/${lo}〜${hi}（前週${fmtSets(pv)}）</span></span>
     </div>`;
   }).join('');
   return `<div class="card">
     <h2>📊 今週の部位別セット数</h2>
-    <div class="sub" style="margin-bottom:10px">${cur.week} の週 / 筋トレ${cur.sessionCount}回。本番セットのみ集計。筋肥大の目安は<b>週10〜20セット</b>。二頭筋・三頭筋は<b>直接種目だけ</b>の数で、ベンチプレスや懸垂の間接的な刺激は含まないため<b>6セット</b>を下限としています。</div>
+    <div class="sub" style="margin-bottom:10px">${cur.week} の週 / 筋トレ${cur.sessionCount}回。主働筋を<b>1セット</b>、補助的に使う部位を<b>0.5セット</b>として数えます（ベンチプレス1セット＝胸1・三頭筋0.5・肩0.5）。ウォームアップは除外。目標は設定タブで変えられます。</div>
     ${rows}
-    <div class="vol-legend"><span class="dot vol-dot-low"></span>不足（腕は6未満、ほかは10未満）　<span class="dot vol-dot-good"></span>適正（〜20）　<span class="dot vol-dot-over"></span>20超</div>
+    <div class="vol-legend"><span class="dot vol-dot-low"></span>目標未満　<span class="dot vol-dot-good"></span>目標の範囲内　<span class="dot vol-dot-over"></span>上限超</div>
   </div>`;
 }
 
@@ -1577,6 +1623,7 @@ function renderSettings(){
     <button class="btn btn-ghost" id="btnResetEquip">初期リストに戻す</button>
     <div id="equipSaved" class="center-msg" style="display:none;color:var(--ok)">✓ 保存しました</div>
   </div>
+  ${renderVolumeTargetCard()}
   ${renderCustomExCard()}
   ${renderBackupCard()}`;
 }
@@ -1667,6 +1714,25 @@ function restoreBackup(text, mode){
     if(d[k] != null && localStorage.getItem(k) == null) localStorage.setItem(k, d[k]);
   });
   return `${added}件の記録を追加しました`;
+}
+
+function renderVolumeTargetCard(){
+  const t = getVolumeTargets();
+  const rows = BODY_PART_ORDER.filter(p=>p!=='その他').map(p=>`<div class="vol-target-row">
+    <span class="vol-part">${p}</span>
+    <input type="number" inputmode="numeric" min="0" max="60" class="vol-target" data-part="${escapeAttr(p)}" data-edge="lo" value="${t[p][0]}">
+    <span class="sub">〜</span>
+    <input type="number" inputmode="numeric" min="0" max="60" class="vol-target" data-part="${escapeAttr(p)}" data-edge="hi" value="${t[p][1]}">
+    <span class="sub">セット/週</span>
+  </div>`).join('');
+  return `<div class="card">
+    <h2>🎯 週あたりの目標セット数</h2>
+    <div class="sub" style="margin-bottom:10px">推移タブの色分けと、Claudeに渡すプロンプトに使います。<br>初期値は「週12〜20セット/部位」（Baz-Valle 2022）を基準に、間接セットを0.5として数える前提で置いています。減量中は下限付近でも筋量は維持できます。</div>
+    ${rows}
+    <button class="btn btn-primary" id="btnSaveVolTargets" style="margin-top:10px">目標を保存</button>
+    <button class="btn btn-ghost" id="btnResetVolTargets">初期値に戻す</button>
+    <div id="volTargetSaved" class="center-msg" style="display:none;color:var(--ok)">✓ 保存しました</div>
+  </div>`;
 }
 
 function renderBackupCard(){
@@ -1843,6 +1909,31 @@ function bindEvents(){
 
   const trendExSelect = document.getElementById('trendExSelect');
   if(trendExSelect) trendExSelect.onchange = ()=>{ state.trendEx = trendExSelect.value; render(); };
+
+  const btnSaveVolTargets = document.getElementById('btnSaveVolTargets');
+  if(btnSaveVolTargets) btnSaveVolTargets.onclick = ()=>{
+    const t = getVolumeTargets();
+    document.querySelectorAll('.vol-target').forEach(inp=>{
+      const v = parseInt(inp.value, 10);
+      if(!Number.isFinite(v) || v < 0 || v > 60) return;
+      const part = inp.dataset.part;
+      if(!t[part]) return;
+      t[part][inp.dataset.edge === 'lo' ? 0 : 1] = v;
+    });
+    // 下限が上限を超えていたら入れ替える
+    Object.keys(t).forEach(p=>{ if(t[p][0] > t[p][1]) t[p] = [t[p][1], t[p][0]]; });
+    saveVolumeTargets(t);
+    render({ skipCapture: true });
+    const msg = document.getElementById('volTargetSaved');
+    if(msg){ msg.style.display='block'; setTimeout(()=>{ msg.style.display='none'; }, 1800); }
+  };
+
+  const btnResetVolTargets = document.getElementById('btnResetVolTargets');
+  if(btnResetVolTargets) btnResetVolTargets.onclick = ()=>{
+    if(!confirm('目標セット数を初期値に戻しますか？')) return;
+    localStorage.removeItem(LS_KEY_VOL_TARGETS);
+    render();
+  };
 
   const btnPickEx = document.getElementById('btnPickEx');
   if(btnPickEx) btnPickEx.onclick = ()=>{ state.entryRows = collectEntryRows(); openPicker('home'); };
