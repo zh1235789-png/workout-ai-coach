@@ -237,3 +237,17 @@ test('BODY_PART_ORDER に腕は無く、二頭筋・三頭筋が入っている'
   assert.ok(!order.includes('腕'));
   assert.deepEqual(order, ['胸','背中','肩','二頭筋','三頭筋','脚','体幹','その他']);
 });
+
+test('bodyPartOf() はナローグリップの背中種目を三頭筋にしない', () => {
+  const a = app();
+  assert.equal(a.bodyPartOf('ナローグリップラットプルダウン'), '背中');
+  assert.equal(a.bodyPartOf('ナローグリップロウ'), '背中');
+  assert.equal(a.bodyPartOf('ナローグリップベンチプレス'), '三頭筋');
+});
+
+test('volumeMin() は腕だけ下限が低い', () => {
+  const a = app();
+  assert.equal(a.volumeMin('二頭筋'), 6);
+  assert.equal(a.volumeMin('三頭筋'), 6);
+  assert.equal(a.volumeMin('胸'), 10);
+});

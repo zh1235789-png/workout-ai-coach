@@ -654,7 +654,7 @@ const BODY_PART_RULES = [
   // 肩・腕は胸より先に判定（リアデルトフライ→肩、インクラインカール→二頭筋 のため）
   { part:'肩',     re:/ショルダー|レイズ|デルト|フェイスプル|アップライト|アーノルド/ },
   { part:'二頭筋', re:/カール|バイセップ|プリチャー|コンセントレーション/ },
-  { part:'三頭筋', re:/トライセップ|スカルクラッシャー|フレンチプレス|キックバック|プレスダウン|ナロー/ },
+  { part:'三頭筋', re:/トライセップ|スカルクラッシャー|フレンチプレス|キックバック|プレスダウン|ナロー.*(ベンチ|プッシュアップ|腕立て|ディップ)/ },
   { part:'胸',   re:/チェスト|ペクトラル|フライ|クロスオーバー|ディップ|ベンチプレス|インクライン|デクライン|プッシュアップ|腕立て/ },
   { part:'背中', re:/プルダウン|ラットプル|ロウ|ロー|チンニング|チンアップ|懸垂|デッドリフト|Tバー|バックエクステンション|背筋|プルオーバー|プルアップ|シュラッグ/ },
   // ここまでで決まらなかった腕の種目（バックエクステンション等は先に背中で拾われる）
@@ -662,6 +662,9 @@ const BODY_PART_RULES = [
   { part:'三頭筋', re:/アーム|エクステンション/ }
 ];
 const BODY_PART_ORDER = ['胸','背中','肩','二頭筋','三頭筋','脚','体幹','その他'];
+// 直接種目だけを数える腕は、複合種目の間接刺激があるぶん下限を低くする
+const VOLUME_MIN = { 二頭筋:6, 三頭筋:6 }, VOLUME_MIN_DEFAULT = 10;
+function volumeMin(part){ return VOLUME_MIN[part] ?? VOLUME_MIN_DEFAULT; }
 
 function bodyPartOf(name){
   for(const r of BODY_PART_RULES){ if(r.re.test(name)) return r.part; }
@@ -1033,7 +1036,7 @@ function weeklyVolumeText(){
   const parts = BODY_PART_ORDER.filter(p=>p!=='その他');
   const fmt = v => parts.map(p=>`${p}${v.byPart[p]||0}`).join(' ');
   if(cur.sessionCount === 0 && prev.sessionCount === 0) return '';
-  return `【週あたりの部位別セット数（本番セットのみ）】\n今週(${cur.week}〜) 筋トレ${cur.sessionCount}回: ${fmt(cur)}\n前週 筋トレ${prev.sessionCount}回: ${fmt(prev)}\n筋肥大の目安は週10〜20セット/部位です。二頭筋・三頭筋は直接種目だけの集計で、ベンチプレスや懸垂による間接的な刺激は含みません（10セット未満でも不足とは限りません）。直近2週で明らかにセット数が不足している部位があれば、次回メニューでその部位を優先し、評価コメントでも指摘してください。`;
+  return `【週あたりの部位別セット数（本番セットのみ）】\n今週(${cur.week}〜) 筋トレ${cur.sessionCount}回: ${fmt(cur)}\n前週 筋トレ${prev.sessionCount}回: ${fmt(prev)}\n筋肥大の目安は週10〜20セット/部位です。二頭筋・三頭筋は直接種目だけの集計で、ベンチプレスや懸垂による間接的な刺激は含まないため、目安は週6〜20セットとしてください。直近2週で明らかにセット数が不足している部位があれば、次回メニューでその部位を優先し、評価コメントでも指摘してください。`;
 }
 
 function renderWeeklyVolumeCard(){
@@ -1045,7 +1048,7 @@ function renderWeeklyVolumeCard(){
     const v = cur.byPart[p] || 0;
     const pv = prev.byPart[p] || 0;
     // 筋肥大の目安は週10〜20セット
-    const cls = v === 0 ? '' : (v < 10 ? ' low' : (v <= 20 ? ' good' : ' over'));
+    const cls = v === 0 ? '' : (v < volumeMin(p) ? ' low' : (v <= 20 ? ' good' : ' over'));
     return `<div class="vol-row">
       <span class="vol-part">${p}</span>
       <span class="vol-bar"><span class="vol-fill${cls}" style="width:${Math.min(100, v/maxVal*100)}%"></span></span>
@@ -1054,9 +1057,9 @@ function renderWeeklyVolumeCard(){
   }).join('');
   return `<div class="card">
     <h2>📊 今週の部位別セット数</h2>
-    <div class="sub" style="margin-bottom:10px">${cur.week} の週 / 筋トレ${cur.sessionCount}回。本番セットのみ集計。筋肥大の目安は<b>週10〜20セット</b>です。二頭筋・三頭筋は<b>直接種目だけ</b>の数で、ベンチプレスや懸垂の間接的な刺激は含みません。</div>
+    <div class="sub" style="margin-bottom:10px">${cur.week} の週 / 筋トレ${cur.sessionCount}回。本番セットのみ集計。筋肥大の目安は<b>週10〜20セット</b>。二頭筋・三頭筋は<b>直接種目だけ</b>の数で、ベンチプレスや懸垂の間接的な刺激は含まないため<b>6セット</b>を下限としています。</div>
     ${rows}
-    <div class="vol-legend"><span class="dot vol-dot-low"></span>10未満（不足）　<span class="dot vol-dot-good"></span>10〜20（適正）　<span class="dot vol-dot-over"></span>20超</div>
+    <div class="vol-legend"><span class="dot vol-dot-low"></span>不足（腕は6未満、ほかは10未満）　<span class="dot vol-dot-good"></span>適正（〜20）　<span class="dot vol-dot-over"></span>20超</div>
   </div>`;
 }
 
