@@ -652,9 +652,14 @@ function parseEquipGroups(text){
   return groups;
 }
 
+// 有酸素マシンは筋トレのセット数に数えない。
+// 「ローイングマシン」はローイングエルゴのこと（筋トレの引く種目は「ロウ」「シーテッドロウ」等で記録される）
+const CARDIO_MACHINE_RE = /トレッドミル|ランニングマシン|バイク|クロストレーナー|ステアクライマー|エアロ|ローイングマシン|ローイングエルゴ/;
+function isCardioMachine(name){ return CARDIO_MACHINE_RE.test(name); }
+
 // 部位判定は上から順に評価し、最初に一致したものを採用する
 const BODY_PART_RULES = [
-  { part:'その他', re:/トレッドミル|ランニングマシン|バイク|クロストレーナー|ステアクライマー|エアロ|ローイングマシン/ },
+  { part:'その他', re:CARDIO_MACHINE_RE },
   { part:'脚',   re:/レッグ(?!レイズ)|スクワット|ランジ|カーフ|インナーサイ|アウターサイ|ヒップ|グルー|ブリッジ|ハック|ルーマニアンデッドリフト/ },
   { part:'体幹', re:/アブドミナル|トルソー|クランチ|プランク|腹筋|シットアップ|ウッドチョップ|レッグレイズ|ニーレイズ|ハンギング|アブローラー|Vアップ/ },
   // 肩・腕は胸より先に判定（リアデルトフライ→肩、インクラインカール→二頭筋 のため）
@@ -1076,6 +1081,7 @@ function weeklyVolume(weeksBack){
     if(weekStart(s.date) !== wk) return;
     sessionCount++;
     (s.exercises||[]).forEach(e=>{
+      if(isCardioMachine(e.name)) return;   // 有酸素マシンはボリュームに数えない
       const work = (e.sets||[]).filter(x=>!x.warmup).length;
       if(!work) return;
       const p = bodyPartOf(e.name);

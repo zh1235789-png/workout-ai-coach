@@ -376,4 +376,5 @@ test('weeklyVolume() は有酸素マシンをセット数に加えない', () =>
   assert.equal(v['広背筋'], 3);
   assert.equal(v['僧帽筋'], 1.5);   // シーテッドロウの分だけ
   assert.equal(v['二頭筋'], 1.5);
+  assert.equal(v['その他'] || 0, 0);   // 有酸素マシンはどの部位にも入らない
 });
