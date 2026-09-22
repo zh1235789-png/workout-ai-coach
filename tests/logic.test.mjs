@@ -208,3 +208,32 @@ test('shiftMonth() は年をまたぐ', () => {
 test('shiftMonth() は複数月ぶんも動かせる', () => {
   assert.equal(app().shiftMonth('2026-09', -12), '2025-09');
 });
+
+// ===== bodyPartOf(): 二頭筋と三頭筋を分けて数える =====
+
+test('bodyPartOf() はカール系を二頭筋にする', () => {
+  const a = app();
+  for(const n of ['アームカール','インクラインカール','プリチャーカール','バイセップカール','コンセントレーションカール']){
+    assert.equal(a.bodyPartOf(n), '二頭筋', n);
+  }
+});
+
+test('bodyPartOf() はプレスダウン系を三頭筋にする', () => {
+  const a = app();
+  for(const n of ['トライセッププレスダウン','スカルクラッシャー','フレンチプレス','キックバック','ナローベンチプレス']){
+    assert.equal(a.bodyPartOf(n), '三頭筋', n);
+  }
+});
+
+test('bodyPartOf() は脚・背中の種目を腕に取られない', () => {
+  const a = app();
+  assert.equal(a.bodyPartOf('レッグカール'), '脚');
+  assert.equal(a.bodyPartOf('レッグエクステンション'), '脚');
+  assert.equal(a.bodyPartOf('バックエクステンション'), '背中');
+});
+
+test('BODY_PART_ORDER に腕は無く、二頭筋・三頭筋が入っている', () => {
+  const order = norm(app().$('BODY_PART_ORDER'));
+  assert.ok(!order.includes('腕'));
+  assert.deepEqual(order, ['胸','背中','肩','二頭筋','三頭筋','脚','体幹','その他']);
+});
