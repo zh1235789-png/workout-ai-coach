@@ -359,3 +359,21 @@ test('secondaryPartsOf() はフライ系で三頭筋を数えない', () => {
   assert.deepEqual(norm(a.secondaryPartsOf('ダンベルフライ')), []);
   assert.deepEqual(norm(a.secondaryPartsOf('ケーブルクロスオーバー')), []);
 });
+
+test('secondaryPartsOf() は有酸素マシン・器具名で補助筋を数えない', () => {
+  const a = app();
+  assert.deepEqual(norm(a.secondaryPartsOf('ローイングマシン')), []);
+  assert.deepEqual(norm(a.secondaryPartsOf('アップライトバイク')), []);
+  assert.deepEqual(norm(a.secondaryPartsOf('パワーラック')), []);
+});
+
+test('weeklyVolume() は有酸素マシンをセット数に加えない', () => {
+  const sessions = [{ id:'s1', date:'2026-09-21', type:'strength', exercises:[
+    { name:'ローイングマシン', sets:[{},{},{}] },
+    { name:'シーテッドロウ', sets:[{},{},{}] },
+  ]}];
+  const v = norm(loadApp({ storage:{ wac_sessions: JSON.stringify(sessions) } }).weeklyVolume(0).byPart);
+  assert.equal(v['広背筋'], 3);
+  assert.equal(v['僧帽筋'], 1.5);   // シーテッドロウの分だけ
+  assert.equal(v['二頭筋'], 1.5);
+});

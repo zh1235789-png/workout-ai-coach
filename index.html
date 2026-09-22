@@ -687,6 +687,8 @@ const SECONDARY_RULES = [
 const SECONDARY_EXCLUDE = [{ re:/ストレートアーム|プルオーバー/, parts:['二頭筋'] }];
 function secondaryPartsOf(name){
   const primary = bodyPartOf(name);
+  // 有酸素マシンや器具名（主働筋が決まらないもの）は補助筋も数えない
+  if(primary === 'その他') return [];
   const out = new Set();
   for(const r of SECONDARY_RULES){ if(r.re.test(name)) r.parts.forEach(p=>{ if(p!==primary) out.add(p); }); }
   for(const r of SECONDARY_EXCLUDE){ if(r.re.test(name)) r.parts.forEach(p=>out.delete(p)); }
