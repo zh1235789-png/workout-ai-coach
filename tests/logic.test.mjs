@@ -229,25 +229,73 @@ test('bodyPartOf() は脚・背中の種目を腕に取られない', () => {
   const a = app();
   assert.equal(a.bodyPartOf('レッグカール'), '脚');
   assert.equal(a.bodyPartOf('レッグエクステンション'), '脚');
-  assert.equal(a.bodyPartOf('バックエクステンション'), '背中');
+  assert.equal(a.bodyPartOf('バックエクステンション'), '広背筋');
 });
 
-test('BODY_PART_ORDER に腕は無く、二頭筋・三頭筋が入っている', () => {
+test('BODY_PART_ORDER は腕と背中をまとめず、4つに分けている', () => {
   const order = norm(app().$('BODY_PART_ORDER'));
   assert.ok(!order.includes('腕'));
-  assert.deepEqual(order, ['胸','背中','肩','二頭筋','三頭筋','脚','体幹','その他']);
+  assert.ok(!order.includes('背中'));
+  assert.deepEqual(order, ['胸','広背筋','僧帽筋','肩','二頭筋','三頭筋','脚','体幹','その他']);
 });
 
 test('bodyPartOf() はナローグリップの背中種目を三頭筋にしない', () => {
   const a = app();
-  assert.equal(a.bodyPartOf('ナローグリップラットプルダウン'), '背中');
-  assert.equal(a.bodyPartOf('ナローグリップロウ'), '背中');
+  assert.equal(a.bodyPartOf('ナローグリップラットプルダウン'), '広背筋');
+  assert.equal(a.bodyPartOf('ナローグリップロウ'), '広背筋');
   assert.equal(a.bodyPartOf('ナローグリップベンチプレス'), '三頭筋');
 });
 
-test('volumeMin() は腕だけ下限が低い', () => {
+test('bodyPartOf() は背中を広背筋と僧帽筋に分ける', () => {
   const a = app();
-  assert.equal(a.volumeMin('二頭筋'), 6);
-  assert.equal(a.volumeMin('三頭筋'), 6);
-  assert.equal(a.volumeMin('胸'), 10);
+  assert.equal(a.bodyPartOf('ラットプルダウン'), '広背筋');
+  assert.equal(a.bodyPartOf('シーテッドロウ'), '広背筋');
+  assert.equal(a.bodyPartOf('懸垂'), '広背筋');
+  assert.equal(a.bodyPartOf('シュラッグ'), '僧帽筋');
+  assert.equal(a.bodyPartOf('デッドリフト'), '僧帽筋');
+  assert.equal(a.bodyPartOf('ルーマニアンデッドリフト'), '脚');
+  assert.equal(a.bodyPartOf('ロータリートルソー'), '体幹');
+});
+
+test('secondaryPartsOf() は補助的に使う部位を返す（主働筋は除く）', () => {
+  const a = app();
+  assert.deepEqual(norm(a.secondaryPartsOf('ベンチプレス')).sort(), ['三頭筋','肩']);
+  assert.deepEqual(norm(a.secondaryPartsOf('ラットプルダウン')), ['二頭筋']);
+  assert.deepEqual(norm(a.secondaryPartsOf('シーテッドロウ')).sort(), ['二頭筋','僧帽筋']);
+  assert.deepEqual(norm(a.secondaryPartsOf('アームカール')), []);
+});
+
+test('weeklyVolume() は補助部位を0.5セットとして数える', () => {
+  const sessions = [{ id:'s1', date:'2026-09-21', type:'strength', exercises:[
+    { name:'ベンチプレス', sets:[{warmup:true},{},{},{},{}] },
+    { name:'アームカール', sets:[{},{},{}] },
+  ]}];
+  const a = loadApp({ storage:{ wac_sessions: JSON.stringify(sessions) } });
+  const v = norm(a.weeklyVolume(0).byPart);
+  assert.equal(v['胸'], 4);        // 本番4セット（ウォームアップは除外）
+  assert.equal(v['三頭筋'], 2);    // 4 × 0.5
+  assert.equal(v['肩'], 2);        // 4 × 0.5
+  assert.equal(v['二頭筋'], 3);
+});
+
+test('getVolumeTargets() は初期値を返し、保存値で上書きできる', () => {
+  assert.deepEqual(norm(app().getVolumeTargets()['胸']), [12,20]);
+  const a = loadApp({ storage:{ wac_vol_targets: JSON.stringify({ 胸:[8,14] }) } });
+  assert.deepEqual(norm(a.getVolumeTargets()['胸']), [8,14]);
+  assert.deepEqual(norm(a.getVolumeTargets()['脚']), [12,20]);   // 未設定の部位は初期値
+});
+
+test('getVolumeTargets() は壊れた保存値を無視する', () => {
+  const a = loadApp({ storage:{ wac_vol_targets: '{"胸":"ダメ","脚":[5]}' } });
+  assert.deepEqual(norm(a.getVolumeTargets()['胸']), [12,20]);
+  assert.deepEqual(norm(a.getVolumeTargets()['脚']), [12,20]);
+});
+
+test('volumeClass() は目標の下限・上限で色を変える', () => {
+  const a = app();
+  assert.equal(a.volumeClass('胸', 0), '');
+  assert.equal(a.volumeClass('胸', 11.5), ' low');
+  assert.equal(a.volumeClass('胸', 12), ' good');
+  assert.equal(a.volumeClass('胸', 20), ' good');
+  assert.equal(a.volumeClass('胸', 20.5), ' over');
 });
