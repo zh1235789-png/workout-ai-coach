@@ -92,7 +92,8 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 .share-preview{width:100%;border-radius:10px;border:1px solid var(--border);margin-top:12px;display:block}
 /* weekly volume */
 .vol-row{display:flex;align-items:center;gap:8px;padding:5px 0}
-.vol-part{width:34px;flex-shrink:0;font-size:12.5px;font-weight:700}
+/* 部位名が「二頭筋」でも折り返さない幅にする */
+.vol-part{width:48px;flex-shrink:0;font-size:12.5px;font-weight:700}
 .vol-bar{flex:1;height:9px;background:var(--bg);border-radius:5px;overflow:hidden}
 .vol-fill{display:block;height:100%;background:var(--border);border-radius:5px}
 .vol-fill.low{background:#eab308}
@@ -650,14 +651,17 @@ function parseEquipGroups(text){
 const BODY_PART_RULES = [
   { part:'脚',   re:/レッグ|スクワット|ランジ|カーフ|インナーサイ|アウターサイ|ヒップ|グルー|ブリッジ|ハック|ルーマニアンデッドリフト/ },
   { part:'体幹', re:/アブドミナル|トルソー|クランチ|プランク|腹筋|シットアップ|ウッドチョップ/ },
-  // 肩・腕は胸より先に判定（リアデルトフライ→肩、インクラインカール→腕 のため）
-  { part:'肩',   re:/ショルダー|レイズ|デルト|フェイスプル|アップライト|アーノルド/ },
-  { part:'腕',   re:/カール|トライセップ|バイセップ|スカルクラッシャー|フレンチプレス|キックバック|プレスダウン|プリチャー/ },
+  // 肩・腕は胸より先に判定（リアデルトフライ→肩、インクラインカール→二頭筋 のため）
+  { part:'肩',     re:/ショルダー|レイズ|デルト|フェイスプル|アップライト|アーノルド/ },
+  { part:'二頭筋', re:/カール|バイセップ|プリチャー|コンセントレーション/ },
+  { part:'三頭筋', re:/トライセップ|スカルクラッシャー|フレンチプレス|キックバック|プレスダウン|ナロー/ },
   { part:'胸',   re:/チェスト|ペクトラル|フライ|クロスオーバー|ディップ|ベンチプレス|インクライン|デクライン|プッシュアップ|腕立て/ },
   { part:'背中', re:/プルダウン|ラットプル|ロウ|ロー|チンニング|チンアップ|懸垂|デッドリフト|Tバー|バックエクステンション|背筋|プルオーバー|プルアップ|シュラッグ/ },
-  { part:'腕',   re:/カール|トライセップ|バイセップ|プレスダウン|キックバック|プリチャー|アーム|エクステンション|スカルクラッシャー|フレンチプレス/ }
+  // ここまでで決まらなかった腕の種目（バックエクステンション等は先に背中で拾われる）
+  { part:'二頭筋', re:/アームカール/ },
+  { part:'三頭筋', re:/アーム|エクステンション/ }
 ];
-const BODY_PART_ORDER = ['胸','背中','肩','腕','脚','体幹','その他'];
+const BODY_PART_ORDER = ['胸','背中','肩','二頭筋','三頭筋','脚','体幹','その他'];
 
 function bodyPartOf(name){
   for(const r of BODY_PART_RULES){ if(r.re.test(name)) return r.part; }
@@ -1029,7 +1033,7 @@ function weeklyVolumeText(){
   const parts = BODY_PART_ORDER.filter(p=>p!=='その他');
   const fmt = v => parts.map(p=>`${p}${v.byPart[p]||0}`).join(' ');
   if(cur.sessionCount === 0 && prev.sessionCount === 0) return '';
-  return `【週あたりの部位別セット数（本番セットのみ）】\n今週(${cur.week}〜) 筋トレ${cur.sessionCount}回: ${fmt(cur)}\n前週 筋トレ${prev.sessionCount}回: ${fmt(prev)}\n筋肥大の目安は週10〜20セット/部位です。直近2週で明らかにセット数が不足している部位があれば、次回メニューでその部位を優先し、評価コメントでも指摘してください。`;
+  return `【週あたりの部位別セット数（本番セットのみ）】\n今週(${cur.week}〜) 筋トレ${cur.sessionCount}回: ${fmt(cur)}\n前週 筋トレ${prev.sessionCount}回: ${fmt(prev)}\n筋肥大の目安は週10〜20セット/部位です。二頭筋・三頭筋は直接種目だけの集計で、ベンチプレスや懸垂による間接的な刺激は含みません（10セット未満でも不足とは限りません）。直近2週で明らかにセット数が不足している部位があれば、次回メニューでその部位を優先し、評価コメントでも指摘してください。`;
 }
 
 function renderWeeklyVolumeCard(){
@@ -1050,7 +1054,7 @@ function renderWeeklyVolumeCard(){
   }).join('');
   return `<div class="card">
     <h2>📊 今週の部位別セット数</h2>
-    <div class="sub" style="margin-bottom:10px">${cur.week} の週 / 筋トレ${cur.sessionCount}回。本番セットのみ集計。筋肥大の目安は<b>週10〜20セット</b>です。</div>
+    <div class="sub" style="margin-bottom:10px">${cur.week} の週 / 筋トレ${cur.sessionCount}回。本番セットのみ集計。筋肥大の目安は<b>週10〜20セット</b>です。二頭筋・三頭筋は<b>直接種目だけ</b>の数で、ベンチプレスや懸垂の間接的な刺激は含みません。</div>
     ${rows}
     <div class="vol-legend"><span class="dot vol-dot-low"></span>10未満（不足）　<span class="dot vol-dot-good"></span>10〜20（適正）　<span class="dot vol-dot-over"></span>20超</div>
   </div>`;
