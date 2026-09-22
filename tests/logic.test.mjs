@@ -316,3 +316,46 @@ test('volumeClass() は渡した目標表を使う', () => {
   assert.equal(a.volumeClass('胸', 9, { 胸:[8,14] }), ' good');
   assert.equal(a.volumeClass('胸', 9), ' low');   // 初期値は12〜20
 });
+
+test('bodyPartOf() はレッグレイズ系を体幹にする', () => {
+  const a = app();
+  assert.equal(a.bodyPartOf('レッグレイズ'), '体幹');
+  assert.equal(a.bodyPartOf('ハンギングレッグレイズ'), '体幹');
+  assert.equal(a.bodyPartOf('ニーレイズ'), '体幹');
+  // 他のレッグ種目・レイズ種目は変わらない
+  assert.equal(a.bodyPartOf('レッグプレス'), '脚');
+  assert.equal(a.bodyPartOf('レッグカール'), '脚');
+  assert.equal(a.bodyPartOf('サイドレイズ'), '肩');
+});
+
+test('bodyPartOf() は有酸素マシンを部位に数えない', () => {
+  const a = app();
+  for(const n of ['トレッドミル','アップライトバイク','リカンベントバイク','クロストレーナー','ステアクライマー']){
+    assert.equal(a.bodyPartOf(n), 'その他', n);
+  }
+});
+
+test('secondaryPartsOf() はインクライン/ダンベルプレスの補助筋も拾う', () => {
+  const a = app();
+  assert.deepEqual(norm(a.secondaryPartsOf('インクラインプレス')).sort(), ['三頭筋','肩']);
+  assert.deepEqual(norm(a.secondaryPartsOf('インクラインダンベルプレス')).sort(), ['三頭筋','肩']);
+});
+
+test('secondaryPartsOf() は肘を曲げない種目で二頭筋を数えない', () => {
+  const a = app();
+  assert.deepEqual(norm(a.secondaryPartsOf('ストレートアームプルダウン')), []);
+  assert.deepEqual(norm(a.secondaryPartsOf('ダンベルプルオーバー')), []);
+});
+
+test('secondaryPartsOf() は後部肩の種目で僧帽筋を数える', () => {
+  const a = app();
+  assert.deepEqual(norm(a.secondaryPartsOf('フェイスプル')), ['僧帽筋']);
+  assert.deepEqual(norm(a.secondaryPartsOf('リアデルトフライ')), ['僧帽筋']);
+});
+
+test('secondaryPartsOf() はフライ系で三頭筋を数えない', () => {
+  const a = app();
+  assert.deepEqual(norm(a.secondaryPartsOf('ペクトラルフライ')), []);
+  assert.deepEqual(norm(a.secondaryPartsOf('ダンベルフライ')), []);
+  assert.deepEqual(norm(a.secondaryPartsOf('ケーブルクロスオーバー')), []);
+});
