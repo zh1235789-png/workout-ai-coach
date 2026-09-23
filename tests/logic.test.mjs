@@ -378,3 +378,39 @@ test('weeklyVolume() は有酸素マシンをセット数に加えない', () =>
   assert.equal(v['二頭筋'], 1.5);
   assert.equal(v['その他'] || 0, 0);   // 有酸素マシンはどの部位にも入らない
 });
+
+// ===== weeklyVolume(): 暦週ではなく直近7日で数える =====
+
+test('weeklyVolume() は直近7日（今日を含む）で数える', () => {
+  const sessions = [
+    { id:'a', date:'2026-09-24', type:'strength', exercises:[{ name:'アームカール', sets:[{},{}] }] },       // 今日
+    { id:'b', date:'2026-09-18', type:'strength', exercises:[{ name:'アームカール', sets:[{},{}] }] },       // 6日前＝範囲内
+    { id:'c', date:'2026-09-17', type:'strength', exercises:[{ name:'アームカール', sets:[{},{},{},{}] }] }, // 7日前＝範囲外
+  ];
+  const a = loadApp({ today:'2026-09-24T09:00:00+09:00', storage:{ wac_sessions: JSON.stringify(sessions) } });
+  const cur = a.weeklyVolume(0);
+  assert.equal(cur.from, '2026-09-18');
+  assert.equal(cur.to, '2026-09-24');
+  assert.equal(norm(cur.byPart)['二頭筋'], 4);
+  assert.equal(cur.sessionCount, 2);
+});
+
+test('weeklyVolume(1) はその前の7日を返し、範囲が重ならない', () => {
+  const sessions = [
+    { id:'c', date:'2026-09-17', type:'strength', exercises:[{ name:'アームカール', sets:[{},{},{},{}] }] },
+  ];
+  const a = loadApp({ today:'2026-09-24T09:00:00+09:00', storage:{ wac_sessions: JSON.stringify(sessions) } });
+  const prev = a.weeklyVolume(1);
+  assert.equal(prev.from, '2026-09-11');
+  assert.equal(prev.to, '2026-09-17');
+  assert.equal(norm(prev.byPart)['二頭筋'], 4);
+  assert.equal(norm(a.weeklyVolume(0).byPart)['二頭筋'] || 0, 0);
+});
+
+test('weeklyVolume() は曜日が変わっても窓がずれるだけで数え落ちない', () => {
+  const sessions = [{ id:'a', date:'2026-09-21', type:'strength', exercises:[{ name:'アームカール', sets:[{},{},{}] }] }];
+  const mon = loadApp({ today:'2026-09-21T09:00:00+09:00', storage:{ wac_sessions: JSON.stringify(sessions) } });
+  const sun = loadApp({ today:'2026-09-27T09:00:00+09:00', storage:{ wac_sessions: JSON.stringify(sessions) } });
+  assert.equal(norm(mon.weeklyVolume(0).byPart)['二頭筋'], 3);
+  assert.equal(norm(sun.weeklyVolume(0).byPart)['二頭筋'], 3);   // 暦週なら翌週扱いで0になっていた
+});
