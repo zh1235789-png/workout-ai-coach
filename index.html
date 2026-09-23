@@ -1063,22 +1063,22 @@ function lineChartSVG(data, unit, color){
 }
 
 /* ===== 週次ボリューム / 1RM推移 ===== */
-function weekStart(dateStr){
+// weeksBack=0 なら直近7日（今日を含む）、1ならその前の7日。
+// 日曜リセットだと週の前半が必ず「不足」に見えるため、移動7日間で数える。
+function shiftDate(dateStr, days){
   const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() - d.getDay()); // 日曜始まり
+  d.setDate(d.getDate() + days);
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 
 function weeklyVolume(weeksBack){
   const sessions = getSessions().filter(s=>s.type!=='cardio' && s.date);
-  const thisWeek = weekStart(todayStr());
-  const target = new Date(thisWeek + 'T00:00:00');
-  target.setDate(target.getDate() - weeksBack*7);
-  const wk = target.getFullYear() + '-' + String(target.getMonth()+1).padStart(2,'0') + '-' + String(target.getDate()).padStart(2,'0');
+  const to = shiftDate(todayStr(), -7*weeksBack);
+  const from = shiftDate(to, -6);
   const byPart = {};
   let sessionCount = 0;
   sessions.forEach(s=>{
-    if(weekStart(s.date) !== wk) return;
+    if(s.date < from || s.date > to) return;
     sessionCount++;
     (s.exercises||[]).forEach(e=>{
       if(isCardioMachine(e.name)) return;   // 有酸素マシンはボリュームに数えない
@@ -1089,7 +1089,7 @@ function weeklyVolume(weeksBack){
       secondaryPartsOf(e.name).forEach(sp=>{ byPart[sp] = (byPart[sp]||0) + work*0.5; });
     });
   });
-  return { week: wk, byPart, sessionCount };
+  return { from, to, byPart, sessionCount };
 }
 
 function weeklyVolumeText(){
@@ -1099,7 +1099,7 @@ function weeklyVolumeText(){
   const fmt = v => parts.map(p=>`${p}${fmtSets(v.byPart[p]||0)}`).join(' ');
   if(cur.sessionCount === 0 && prev.sessionCount === 0) return '';
   const goals = parts.map(p=>`${p}${t[p][0]}〜${t[p][1]}`).join(' ');
-  return `【週あたりの部位別セット数】\n今週(${cur.week}〜) 筋トレ${cur.sessionCount}回: ${fmt(cur)}\n前週 筋トレ${prev.sessionCount}回: ${fmt(prev)}\n週の目標セット数: ${goals}\n主働筋を1セット、補助的に使う部位を0.5セットとして数えています（例: ベンチプレス1セット＝胸1・三頭筋0.5・肩0.5）。ウォームアップは含みません。\n直近2週で目標を下回っている部位があれば、次回メニューでその部位を優先し、評価コメントでも指摘してください。減量中は下限付近でも筋量は維持できます。`;
+  return `【部位別セット数（7日ごと）】\n直近7日(${cur.from}〜${cur.to}) 筋トレ${cur.sessionCount}回: ${fmt(cur)}\nその前の7日 筋トレ${prev.sessionCount}回: ${fmt(prev)}\n7日あたりの目標セット数: ${goals}\n主働筋を1セット、補助的に使う部位を0.5セットとして数えています（例: ベンチプレス1セット＝胸1・三頭筋0.5・肩0.5）。ウォームアップは含みません。\n目標を下回っている部位があれば、次回メニューでその部位を優先し、評価コメントでも指摘してください。減量中は下限付近でも筋量は維持できます。`;
 }
 
 function renderWeeklyVolumeCard(){
@@ -1116,12 +1116,13 @@ function renderWeeklyVolumeCard(){
     return `<div class="vol-row">
       <span class="vol-part">${p}</span>
       <span class="vol-bar"><span class="vol-fill${cls}" style="width:${Math.min(100, v/maxVal*100)}%"></span><span class="vol-goal" style="left:${Math.min(100, lo/maxVal*100)}%"></span></span>
-      <span class="vol-num${cls}">${fmtSets(v)}<span class="vol-prev">/${lo}〜${hi}（前週${fmtSets(pv)}）</span></span>
+      <span class="vol-num${cls}">${fmtSets(v)}<span class="vol-prev">/${lo}〜${hi}（前7日${fmtSets(pv)}）</span></span>
     </div>`;
   }).join('');
+  const md = d => d.slice(5).replace('-','/');
   return `<div class="card">
-    <h2>📊 今週の部位別セット数</h2>
-    <div class="sub" style="margin-bottom:10px">${cur.week} の週 / 筋トレ${cur.sessionCount}回。主働筋を<b>1セット</b>、補助的に使う部位を<b>0.5セット</b>として数えます（ベンチプレス1セット＝胸1・三頭筋0.5・肩0.5）。ウォームアップは除外。目標は設定タブで変えられます。</div>
+    <h2>📊 直近7日の部位別セット数</h2>
+    <div class="sub" style="margin-bottom:10px">${md(cur.from)}〜${md(cur.to)} / 筋トレ${cur.sessionCount}回。主働筋を<b>1セット</b>、補助的に使う部位を<b>0.5セット</b>として数えます（ベンチプレス1セット＝胸1・三頭筋0.5・肩0.5）。ウォームアップは除外。目標は設定タブで変えられます。</div>
     ${rows}
     <div class="vol-legend"><span class="dot vol-dot-low"></span>目標未満　<span class="dot vol-dot-good"></span>目標の範囲内　<span class="dot vol-dot-over"></span>上限超</div>
   </div>`;
