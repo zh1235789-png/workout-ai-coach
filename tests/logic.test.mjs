@@ -414,3 +414,52 @@ test('weeklyVolume() は曜日が変わっても窓がずれるだけで数え�
   assert.equal(norm(mon.weeklyVolume(0).byPart)['二頭筋'], 3);
   assert.equal(norm(sun.weeklyVolume(0).byPart)['二頭筋'], 3);   // 暦週なら翌週扱いで0になっていた
 });
+
+// ===== 集計期間の切り替え（直近7日 / 暦週） =====
+
+test('weeklyVolume() は暦週モードだと日曜始まりで数える', () => {
+  const sessions = [
+    { id:'a', date:'2026-09-24', type:'strength', exercises:[{ name:'アームカール', sets:[{},{}] }] },   // 木
+    { id:'b', date:'2026-09-19', type:'strength', exercises:[{ name:'アームカール', sets:[{},{}] }] },   // 前週の土
+  ];
+  const a = loadApp({ today:'2026-09-24T09:00:00+09:00', storage:{ wac_sessions: JSON.stringify(sessions), wac_vol_range:'week' } });
+  const cur = a.weeklyVolume(0);
+  assert.equal(cur.from, '2026-09-20');   // 日曜
+  assert.equal(cur.to, '2026-09-26');     // 土曜
+  assert.equal(norm(cur.byPart)['二頭筋'], 2);
+  const prev = a.weeklyVolume(1);
+  assert.equal(prev.from, '2026-09-13');
+  assert.equal(norm(prev.byPart)['二頭筋'], 2);   // 9/19は前週に入る
+});
+
+test('getVolumeRange() の既定は直近7日で、保存値で切り替わる', () => {
+  assert.equal(loadApp({}).getVolumeRange(), 'rolling');
+  assert.equal(loadApp({ storage:{ wac_vol_range:'week' } }).getVolumeRange(), 'week');
+  assert.equal(loadApp({ storage:{ wac_vol_range:'へんな値' } }).getVolumeRange(), 'rolling');
+});
+
+test('weeklyVolume() は引数でモードを上書きできる', () => {
+  const sessions = [{ id:'b', date:'2026-09-19', type:'strength', exercises:[{ name:'アームカール', sets:[{},{}] }] }];
+  const a = loadApp({ today:'2026-09-24T09:00:00+09:00', storage:{ wac_sessions: JSON.stringify(sessions) } });
+  assert.equal(norm(a.weeklyVolume(0, 'rolling').byPart)['二頭筋'], 2);       // 5日前なので直近7日に入る
+  assert.equal(norm(a.weeklyVolume(0, 'week').byPart)['二頭筋'] || 0, 0);     // 暦週では前週
+});
+
+test('renderWeeklyVolumeCard() は例外なくHTMLを返す（両モード）', () => {
+  const sessions = [{ id:'a', date:'2026-09-24', type:'strength', exercises:[{ name:'ベンチプレス', sets:[{},{},{}] }] }];
+  for(const range of ['rolling','week']){
+    const a = loadApp({ today:'2026-09-24T09:00:00+09:00', storage:{ wac_sessions: JSON.stringify(sessions), wac_vol_range: range } });
+    const html = a.renderWeeklyVolumeCard();
+    assert.match(html, /部位別セット数/);
+    assert.match(html, /vol-range/);            // 切り替えボタンがある
+    assert.match(html, /三頭筋/);
+  }
+});
+
+test('renderTrends() と weeklyVolumeText() も例外なく動く（両モード）', () => {
+  for(const range of ['rolling','week']){
+    const a = loadApp({ today:'2026-09-24T09:00:00+09:00', storage:{ wac_vol_range: range } });
+    assert.equal(typeof a.renderTrends(), 'string');
+    assert.equal(typeof a.weeklyVolumeText(), 'string');
+  }
+});
