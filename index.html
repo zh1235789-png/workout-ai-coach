@@ -243,7 +243,8 @@ const LS_KEY_CUSTOM_EX = 'wac_custom_exercises';
 const LS_KEY_BODY = 'wac_body';
 const LS_KEY_LAST_BACKUP = 'wac_last_backup';
 const LS_KEY_VOL_TARGETS = 'wac_vol_targets';
-const BACKUP_KEYS = [LS_KEY_SESSIONS, LS_KEY_CONDITION, LS_KEY_GYM_EQUIP_1, LS_KEY_GYM_EQUIP_2, LS_KEY_LAST_GYM, LS_KEY_CUSTOM_EX, LS_KEY_BODY, LS_KEY_VOL_TARGETS];
+const LS_KEY_VOL_RANGE = 'wac_vol_range';
+const BACKUP_KEYS = [LS_KEY_SESSIONS, LS_KEY_CONDITION, LS_KEY_GYM_EQUIP_1, LS_KEY_GYM_EQUIP_2, LS_KEY_LAST_GYM, LS_KEY_CUSTOM_EX, LS_KEY_BODY, LS_KEY_VOL_TARGETS, LS_KEY_VOL_RANGE];
 const DEFAULT_CONDITION = '左ハムストリング肉離れ(2026-07-04受傷)からリハビリ中。脚トレは控えめ・痛みが出ない範囲で漸進的に。目的は健康維持・筋力向上・体脂肪率の低下。筋トレ週3-4回、有酸素運動(ランニング・ウォーキング)週3-4回。';
 
 const GYM_NAMES = { '1': 'エニタイムフィットネス志村坂上店', '2': 'エニタイムフィットネス文京本郷店（本郷三丁目）' };
@@ -1063,18 +1064,34 @@ function lineChartSVG(data, unit, color){
 }
 
 /* ===== 週次ボリューム / 1RM推移 ===== */
-// weeksBack=0 なら直近7日（今日を含む）、1ならその前の7日。
-// 日曜リセットだと週の前半が必ず「不足」に見えるため、移動7日間で数える。
+// 集計期間: 'rolling' = 直近7日（今日を含む移動窓） / 'week' = 暦週（日曜始まり）
+function getVolumeRange(){ return localStorage.getItem(LS_KEY_VOL_RANGE) === 'week' ? 'week' : 'rolling'; }
+function setVolumeRange(mode){ localStorage.setItem(LS_KEY_VOL_RANGE, mode === 'week' ? 'week' : 'rolling'); }
+
+function weekStart(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() - d.getDay()); // 日曜始まり
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+// weeksBack=0 なら今の期間、1ならその1つ前。どちらのモードでも期間は重ならない。
 function shiftDate(dateStr, days){
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + days);
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 
-function weeklyVolume(weeksBack){
+function weeklyVolume(weeksBack, mode){
   const sessions = getSessions().filter(s=>s.type!=='cardio' && s.date);
-  const to = shiftDate(todayStr(), -7*weeksBack);
-  const from = shiftDate(to, -6);
+  const today = todayStr();
+  let from, to;
+  if((mode || getVolumeRange()) === 'week'){
+    from = shiftDate(weekStart(today), -7*weeksBack);
+    to = shiftDate(from, 6);
+  }else{
+    to = shiftDate(today, -7*weeksBack);
+    from = shiftDate(to, -6);
+  }
   const byPart = {};
   let sessionCount = 0;
   sessions.forEach(s=>{
@@ -1099,7 +1116,8 @@ function weeklyVolumeText(){
   const fmt = v => parts.map(p=>`${p}${fmtSets(v.byPart[p]||0)}`).join(' ');
   if(cur.sessionCount === 0 && prev.sessionCount === 0) return '';
   const goals = parts.map(p=>`${p}${t[p][0]}〜${t[p][1]}`).join(' ');
-  return `【部位別セット数（7日ごと）】\n直近7日(${cur.from}〜${cur.to}) 筋トレ${cur.sessionCount}回: ${fmt(cur)}\nその前の7日 筋トレ${prev.sessionCount}回: ${fmt(prev)}\n7日あたりの目標セット数: ${goals}\n主働筋を1セット、補助的に使う部位を0.5セットとして数えています（例: ベンチプレス1セット＝胸1・三頭筋0.5・肩0.5）。ウォームアップは含みません。\n目標を下回っている部位があれば、次回メニューでその部位を優先し、評価コメントでも指摘してください。減量中は下限付近でも筋量は維持できます。`;
+  const wk = getVolumeRange() === 'week';
+  return `【部位別セット数（${wk ? '暦週' : '7日ごと'}）】\n${wk ? '今週' : '直近7日'}(${cur.from}〜${cur.to}) 筋トレ${cur.sessionCount}回: ${fmt(cur)}\n${wk ? '前週' : 'その前の7日'} 筋トレ${prev.sessionCount}回: ${fmt(prev)}\n週あたりの目標セット数: ${goals}${wk ? '\n※今週はまだ途中の可能性があります。' : ''}\n主働筋を1セット、補助的に使う部位を0.5セットとして数えています（例: ベンチプレス1セット＝胸1・三頭筋0.5・肩0.5）。ウォームアップは含みません。\n目標を下回っている部位があれば、次回メニューでその部位を優先し、評価コメントでも指摘してください。減量中は下限付近でも筋量は維持できます。`;
 }
 
 function renderWeeklyVolumeCard(){
@@ -1108,6 +1126,7 @@ function renderWeeklyVolumeCard(){
   const parts = BODY_PART_ORDER.filter(p=>p!=='その他');
   const t = getVolumeTargets();
   const maxVal = Math.max(10, ...parts.map(p=>Math.max(cur.byPart[p]||0, t[p][1])));
+  const wk = getVolumeRange() === 'week';
   let rows = parts.map(p=>{
     const v = cur.byPart[p] || 0;
     const pv = prev.byPart[p] || 0;
@@ -1116,12 +1135,16 @@ function renderWeeklyVolumeCard(){
     return `<div class="vol-row">
       <span class="vol-part">${p}</span>
       <span class="vol-bar"><span class="vol-fill${cls}" style="width:${Math.min(100, v/maxVal*100)}%"></span><span class="vol-goal" style="left:${Math.min(100, lo/maxVal*100)}%"></span></span>
-      <span class="vol-num${cls}">${fmtSets(v)}<span class="vol-prev">/${lo}〜${hi}（前7日${fmtSets(pv)}）</span></span>
+      <span class="vol-num${cls}">${fmtSets(v)}<span class="vol-prev">/${lo}〜${hi}（${wk ? '前週' : '前7日'}${fmtSets(pv)}）</span></span>
     </div>`;
   }).join('');
   const md = d => d.slice(5).replace('-','/');
   return `<div class="card">
-    <h2>📊 直近7日の部位別セット数</h2>
+    <h2>📊 部位別セット数</h2>
+    <div class="seg" style="margin-bottom:10px">
+      <button class="vol-range${wk ? '' : ' sel'}" data-range="rolling">直近7日</button>
+      <button class="vol-range${wk ? ' sel' : ''}" data-range="week">今週（日〜土）</button>
+    </div>
     <div class="sub" style="margin-bottom:10px">${md(cur.from)}〜${md(cur.to)} / 筋トレ${cur.sessionCount}回。主働筋を<b>1セット</b>、補助的に使う部位を<b>0.5セット</b>として数えます（ベンチプレス1セット＝胸1・三頭筋0.5・肩0.5）。ウォームアップは除外。目標は設定タブで変えられます。</div>
     ${rows}
     <div class="vol-legend"><span class="dot vol-dot-low"></span>目標未満　<span class="dot vol-dot-good"></span>目標の範囲内　<span class="dot vol-dot-over"></span>上限超</div>
@@ -1928,6 +1951,10 @@ function bindEvents(){
 
   const trendExSelect = document.getElementById('trendExSelect');
   if(trendExSelect) trendExSelect.onchange = ()=>{ state.trendEx = trendExSelect.value; render(); };
+
+  document.querySelectorAll('.vol-range').forEach(b=>{
+    b.onclick = ()=>{ setVolumeRange(b.dataset.range); render(); };
+  });
 
   const btnSaveVolTargets = document.getElementById('btnSaveVolTargets');
   if(btnSaveVolTargets) btnSaveVolTargets.onclick = ()=>{
