@@ -1632,18 +1632,8 @@ function render1RMCard(){
 }
 
 function renderTrends(){
-  const logs = getBodyLogs().slice().sort((a,b)=>a.date.localeCompare(b.date));
-  const weight = logs.filter(b=>b.weight!=null).map(b=>({date:b.date, value:b.weight}));
-  const fat = logs.filter(b=>b.fat!=null).map(b=>({date:b.date, value:b.fat}));
-
-  // 体重・体脂肪率は HealthTracker に一本化した
-  let html = renderWeeklyVolumeCard() + render1RMCard() + renderBikeTrendCard();
-  html += `<div class="card">
-    <h2>⚖️ 体重・体脂肪率</h2>
-    <div class="sub" style="margin-bottom:10px">体重と体脂肪率は HealthTracker で記録・確認します。</div>
-    <a class="btn btn-secondary" href="https://zh1235789-png.github.io/healthtracker/" target="_blank" rel="noopener" style="text-decoration:none">HealthTracker を開く ↗</a>
-  </div>`;
-  return html;
+  // 体重・体脂肪率は HealthTracker に一本化した（このアプリからの案内リンクは置かない）
+  return renderWeeklyVolumeCard() + render1RMCard() + renderBikeTrendCard();
 }
 
 function setWeightLabel(s){
