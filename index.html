@@ -115,6 +115,36 @@ input[type=number].vol-target{width:64px;flex:0 0 64px;padding:9px 4px;text-alig
 .today-cardio{margin-top:12px;border-top:1px solid var(--border);padding-top:10px}
 .today-cardio-head{font-size:11.5px;color:var(--sub);font-weight:700;margin-bottom:6px}
 .today-cardio-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;padding:5px 0}
+.bike-box{background:var(--accent-soft);border-radius:10px;padding:12px;margin-top:10px}
+.bike-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.bike-label{font-size:11px;color:var(--accent);font-weight:700;letter-spacing:.05em}
+.bike-unit{display:flex;background:rgba(0,0,0,.08);border-radius:8px;padding:2px;gap:2px;margin-left:auto}
+.bike-unit button{padding:4px 10px;border:none;border-radius:6px;background:transparent;color:var(--sub);font-size:11px;font-weight:700;cursor:pointer}
+.bike-unit button.sel{background:var(--card);color:var(--accent)}
+.bike-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.bike-cell{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--accent);font-weight:700}
+.bike-cell input{width:100%;min-width:0;padding:8px 4px;text-align:center;font-size:16px;font-weight:700}
+.bike-avg{margin-top:10px;font-size:13px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.bike-avg b{font-size:19px}
+.bike-sub{margin-top:12px;font-size:11px;color:var(--accent);font-weight:700}
+.bike-note{margin-top:8px;font-size:12px;line-height:1.5}
+.bike-fade{margin-top:8px;font-size:12px;padding:8px 10px;border-radius:8px;line-height:1.5}
+.bike-fade.warn{background:var(--warn-bg);color:var(--warn)}
+.bike-fade.ok{background:var(--ok-bg);color:var(--ok)}
+.bike-pill{display:inline-block;padding:1px 7px;border-radius:999px;color:#fff;font-weight:700;font-size:11px}
+.bike-z4{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:12px;color:var(--accent);font-weight:700}
+.bike-z4 input{width:64px;padding:8px 4px;text-align:center;font-size:16px;font-weight:700}
+.bike-row{display:flex;align-items:center;gap:8px;padding:6px 2px;font-size:12px}
+.bike-date{width:42px;font-weight:600}
+.bike-bar{flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden}
+.bike-bar > span{display:block;height:100%;background:#8b5cf6;border-radius:4px}
+.bike-w{width:58px;text-align:right;font-weight:700;font-size:13px}
+.bike-tag{width:40px;text-align:right;font-size:11px;color:var(--sub)}
+.bike-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:6px}
+.bike-table th,.bike-table td{padding:5px 4px;text-align:center;border-bottom:1px solid var(--border)}
+.bike-table th{font-size:11px;color:var(--sub)}
+.bk-rpe-row{display:flex;gap:3px;margin-top:4px}
+.bk-rpe{flex:1;min-width:0;padding:9px 0;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:12px;font-weight:700;cursor:pointer}
 .cardio-del{background:transparent;border:1px solid var(--border);color:var(--sub);border-radius:8px;width:30px;height:30px;font-size:12px;flex-shrink:0;cursor:pointer}
 .draft-note{background:var(--accent-soft);color:var(--accent);border-radius:8px;padding:8px 10px;font-size:12.5px;margin-bottom:10px}
 /* pain score */
@@ -183,6 +213,7 @@ input[type=number].vol-target{width:64px;flex:0 0 64px;padding:9px 4px;text-alig
 .dot-strength{background:var(--accent)}
 .dot-run{background:#ef4444}
 .dot-walk{background:#3b82f6}
+.dot-bike{background:#8b5cf6}
 .cal-legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:11px;color:var(--sub)}
 .cal-legend span{display:flex;align-items:center;gap:4px}
 .cal-legend-total{margin-left:auto;font-weight:700}
@@ -196,8 +227,6 @@ input[type=number].vol-target{width:64px;flex:0 0 64px;padding:9px 4px;text-alig
 .tabbar button{flex:1;background:none;border:none;padding:10px 0 8px;color:var(--sub);font-size:11px;display:flex;flex-direction:column;align-items:center;gap:3px}
 .tabbar button .ic{font-size:20px}
 .tabbar button.sel{color:var(--accent)}
-.tabbar .tab-link{flex:1;padding:10px 0 8px;color:var(--sub);font-size:11px;display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none}
-.tabbar .tab-link .ic{font-size:20px}
 .detail-close{float:right;color:var(--sub);font-size:13px}
 .saved-badge{display:inline-block;background:var(--ok-bg);color:var(--ok);font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;margin-bottom:10px}
 </style>
@@ -230,7 +259,6 @@ input[type=number].vol-target{width:64px;flex:0 0 64px;padding:9px 4px;text-alig
   <button data-tab="history" class="tab-btn"><span class="ic">📋</span>履歴</button>
   <button data-tab="trends" class="tab-btn"><span class="ic">📈</span>推移</button>
   <button data-tab="settings" class="tab-btn"><span class="ic">⚙️</span>設定</button>
-  <a href="https://zh1235789-png.github.io/healthtracker/" target="_blank" rel="noopener" class="tab-link"><span class="ic">🍽️</span>食事・体重↗</a>
 </nav>
 
 <script>
@@ -244,11 +272,14 @@ const LS_KEY_BODY = 'wac_body';
 const LS_KEY_LAST_BACKUP = 'wac_last_backup';
 const LS_KEY_VOL_TARGETS = 'wac_vol_targets';
 const LS_KEY_VOL_RANGE = 'wac_vol_range';
-const BACKUP_KEYS = [LS_KEY_SESSIONS, LS_KEY_CONDITION, LS_KEY_GYM_EQUIP_1, LS_KEY_GYM_EQUIP_2, LS_KEY_LAST_GYM, LS_KEY_CUSTOM_EX, LS_KEY_BODY, LS_KEY_VOL_TARGETS, LS_KEY_VOL_RANGE];
+const LS_KEY_BIKE_UNIT = 'wac_bike_unit';
+const BACKUP_KEYS = [LS_KEY_SESSIONS, LS_KEY_CONDITION, LS_KEY_GYM_EQUIP_1, LS_KEY_GYM_EQUIP_2, LS_KEY_LAST_GYM, LS_KEY_CUSTOM_EX, LS_KEY_BODY, LS_KEY_VOL_TARGETS, LS_KEY_VOL_RANGE, LS_KEY_BIKE_UNIT];
 const DEFAULT_CONDITION = '左ハムストリング肉離れ(2026-07-04受傷)からリハビリ中。脚トレは控えめ・痛みが出ない範囲で漸進的に。目的は健康維持・筋力向上・体脂肪率の低下。筋トレ週3-4回、有酸素運動(ランニング・ウォーキング)週3-4回。';
 
 const GYM_NAMES = { '1': 'エニタイムフィットネス志村坂上店', '2': 'エニタイムフィットネス文京本郷店（本郷三丁目）' };
-const CARDIO_LABELS = { 'none': 'なし', 'walk': 'ウォーキング', 'run': 'ランニング' };
+const CARDIO_LABELS = { 'none': 'なし', 'walk': 'ウォーキング', 'run': 'ランニング', 'bike': 'バイク4×4' };
+const CARDIO_ICONS = { 'walk': '🚶', 'run': '🏃', 'bike': '🚴' };
+function cardioName(kind){ return `${CARDIO_ICONS[kind]||''} ${CARDIO_LABELS[kind]||kind}`; }
 const DEFAULT_EQUIP_1 = `【マシン種目】チェストプレス、インクラインプレス、ペクトラルフライ、リアデルトフライ、ショルダープレス、DPLショルダープレス、ラテラルレイズ、シーテッドロウ、DPLシーテッドロウ、プルダウン、Tバーロウ、ディップ、チンニング、プリチャーカール、シーテッドアームカール、ロータリートルソー、アブドミナル、レッグエクステンション、レッグカール、レッグプレス、アングルドレッグプレス、インナーサイ、アウターサイ、グルートブリッジ、ハックスクワット、アイソラテラル系マシン各種
 【フリーウェイト種目（パワーラック・スミスマシン・ダンベル・ベンチ）】ベンチプレス、インクラインベンチプレス、ダンベルベンチプレス、インクラインダンベルプレス、ダンベルフライ、スミスベンチプレス、スミスインクラインプレス、バーベルロウ、ダンベルロウ、ワンハンドロウ、デッドリフト、ルーマニアンデッドリフト、シュラッグ、ダンベルプルオーバー、バーベルショルダープレス、ダンベルショルダープレス、アーノルドプレス、サイドレイズ、フロントレイズ、リアレイズ、リアデルトフライ、アップライトロウ、バーベルカール、ダンベルカール、ハンマーカール、インクラインカール、コンセントレーションカール、スカルクラッシャー、フレンチプレス、キックバック、スクワット、スミススクワット、フロントスクワット、ブルガリアンスクワット、ランジ、ヒップスラスト、カーフレイズ
 【ケーブルマシン種目】ケーブルフライ、ケーブルクロスオーバー、ケーブルロウ、ラットプルダウン、ストレートアームプルダウン、フェイスプル、ケーブルサイドレイズ、ケーブルリアデルトフライ、ケーブルカール、トライセップスプレスダウン、ケーブルキックバック、ケーブルクランチ
@@ -261,7 +292,7 @@ const DEFAULT_EQUIP_2 = `【マシン種目(PRECOR製)】チェストプレス�
 【保有器具】パワーラック(3台)、スミスマシン、ケーブルマシン、ダンベル、ベンチ、ストレッチエリア、体組成計
 【有酸素(PRECOR製)】トレッドミル(8台)、クロストレーナー(2台)、リカンベントバイク(2台)、アップライトバイク(2台)`;
 
-let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null, pickerTarget: null, pain: null, trendEx: null, cardioMin: null, cardioKm: null, filterDate: null, pasteText: null };
+let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, bikeDraft: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null, pickerTarget: null, pain: null, trendEx: null, cardioMin: null, cardioKm: null, filterDate: null, pasteText: null };
 
 function getSessions(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_SESSIONS)||'[]'); }catch(e){ return []; } }
 function saveSessions(list){ localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list)); }
@@ -273,13 +304,13 @@ function switchTab(tab){
   // 記録途中の内容（種目・有酸素・痛み・貼り付け・解析結果）は残し、画面表示の状態だけ戻す
   capturePendingInputs();
   state.tab = tab;
-  state.error = null; state.viewingSession = null; state.filterDate = null; state.shareImage = null; state.editDraft = null;
+  state.error = null; state.cardioError = null; state.viewingSession = null; state.filterDate = null; state.shareImage = null; state.editDraft = null;
   render({ skipCapture: true });
 }
 
 /* ===== 記録途中の下書き（タブ切替・アプリ終了でも残す） ===== */
 const LS_KEY_DRAFT = 'wac_draft';
-const DRAFT_KEYS = ['entryRows','entryRowsFromMenu','cardio','cardioMin','cardioKm','pain','pasteText','pendingResult'];
+const DRAFT_KEYS = ['entryRows','entryRowsFromMenu','cardio','bikeDraft','cardioMin','cardioKm','pain','pasteText','pendingResult'];
 
 function saveDraft(){
   try{
@@ -302,7 +333,8 @@ function draftHasContent(d){
   const customRow = !d.entryRowsFromMenu && (d.entryRows||[]).some(r=>(r.name||'').trim());
   return setUsed || customRow || !!d.pasteText || !!d.pendingResult
     || d.cardioMin != null && d.cardioMin !== '' || d.cardioKm != null && d.cardioKm !== ''
-    || (d.cardio && d.cardio !== 'none') || (d.pain != null && d.pain > 0);
+    || (d.cardio && d.cardio !== 'none') || (d.pain != null && d.pain > 0)
+    || (d.bikeDraft && bikeAvg(d.bikeDraft) !== null);
 }
 
 function loadDraft(){
@@ -477,10 +509,12 @@ function renderHome(){
       <button data-cardio="none" class="cardio-btn${state.cardio==='none'?' sel':''}">なし</button>
       <button data-cardio="walk" class="cardio-btn${state.cardio==='walk'?' sel':''}">ウォーキング</button>
       <button data-cardio="run" class="cardio-btn${state.cardio==='run'?' sel':''}">ランニング</button>
+      <button data-cardio="bike" class="cardio-btn${state.cardio==='bike'?' sel':''}">バイク4×4</button>
     </div>
+    ${state.cardio==='bike' ? renderBikeInputs(state.bikeDraft || (state.bikeDraft = emptyBike()), { date: state.cardioLogDate || todayStr() }, 'log') : ''}
     <div class="body-row" style="margin-top:10px">
       <input type="number" id="cardioMin" placeholder="時間（分）" inputmode="numeric" value="${escapeAttr(state.cardioMin||'')}">
-      <input type="number" id="cardioKm" placeholder="距離（km）" inputmode="decimal" step="0.1" value="${escapeAttr(state.cardioKm||'')}">
+      ${state.cardio==='bike' ? '' : `<input type="number" id="cardioKm" placeholder="距離（km）" inputmode="decimal" step="0.1" value="${escapeAttr(state.cardioKm||'')}">`}
     </div>
     <div class="field" style="margin-top:10px;margin-bottom:0">
       <label>日付</label>
@@ -488,6 +522,7 @@ function renderHome(){
     </div>
     <button class="btn btn-secondary" id="btnLogCardio" style="margin-top:10px">有酸素を記録</button>
     <div id="cardioLogSaved" class="center-msg" style="display:none;color:var(--ok)">✓ 記録しました</div>
+    ${state.cardioError ? `<div class="err-box" style="margin-top:10px">${escapeHtml(state.cardioError)}</div>` : ''}
     ${renderTodayCardioList()}
   </div>`;
 
@@ -1007,12 +1042,15 @@ function cardioEntriesForDate(date){
 function cardioSummaryForDate(date){
   const list = cardioEntriesForDate(date);
   if(list.length === 0) return null;
-  const kind = list.some(x=>x.cardio === 'run') ? 'run' : 'walk';
+  // 脚トレ可否の判断に効く順（ラン > バイク > ウォーキング）で代表を決める
+  const kind = ['run','bike','walk'].find(k=>list.some(x=>x.cardio === k)) || 'walk';
+  const label = ['run','bike','walk'].filter(k=>list.some(x=>x.cardio === k)).map(k=>CARDIO_LABELS[k]).join('＋');
   const sum = (key)=>{
     const vals = list.map(x=>x[key]).filter(v=>v != null);
     return vals.length ? vals.reduce((a,b)=>a+b, 0) : null;
   };
-  return { cardio: kind, cardioMin: sum('cardioMin'), cardioKm: sum('cardioKm'), count: list.length };
+  const bikes = list.filter(x=>x.cardio === 'bike' && x.bike).map(x=>bikeSummaryLabel(x.bike)).filter(Boolean);
+  return { cardio: kind, label, bikeLabel: bikes.join(' / '), cardioMin: sum('cardioMin'), cardioKm: sum('cardioKm'), count: list.length };
 }
 
 function renderTodayCardioList(){
@@ -1020,7 +1058,7 @@ function renderTodayCardioList(){
   const list = cardioEntriesForDate(date);
   if(list.length === 0) return '';
   const rows = list.map(x=>
-    `<div class="today-cardio-row"><span>${x.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}${escapeHtml(cardioDetailLabel(x))}</span>`
+    `<div class="today-cardio-row"><span>${cardioName(x.cardio)}${escapeHtml(cardioDetailLabel(x))}</span>`
     + `<button class="cardio-del" data-id="${escapeAttr(x.id)}" title="削除">✕</button></div>`
   ).join('');
   return `<div class="today-cardio"><div class="today-cardio-head">${escapeHtml(date)} の有酸素記録</div>${rows}</div>`;
@@ -1028,9 +1066,406 @@ function renderTodayCardioList(){
 
 function cardioDetailLabel(s){
   const parts = [];
+  if(s.cardio === 'bike' && s.bike){ const b = bikeSummaryLabel(s.bike); if(b) parts.push(b); }
   if(s.cardioMin != null) parts.push(`${s.cardioMin}分`);
   if(s.cardioKm != null) parts.push(`${s.cardioKm}km`);
   return parts.length ? `（${parts.join(' / ')}）` : '';
+}
+
+/* ===== バイク4×4（VO2maxトラック）=====
+   ハムリハから移管（2026-10-04）。有酸素の記録はこのアプリに一本化する。
+   ハムの伸張負荷ゼロで心肺（一回拍出量）だけを叩く枠で、4分×4本の各本終盤の値を残す。 */
+const LS_KEY_HAMREHAB_IMPORTED = 'wac_hamrehab_bike_imported';
+const HAMREHAB_KEY = 'hamrehab_v1';
+// 心拍はタイプミス（178→1780）が基準値を壊すので、生理的にありえない値は受け付けない
+const BIKE_HR_MIN = 60, BIKE_HR_MAX = 230;
+// ゾーン4以上の滞在時間の目安。心拍の立ち上がりに1〜2分かかるので1本あたり実質2分前後
+const BIKE_Z4_TARGET_SEC = [480, 600];
+// RPE 1〜10（Borg CR10準拠）。4×4の狙いは8〜9で、7以下だと刺激が足りない
+const BIKE_RPE = [
+  {v:1, label:'非常に楽', c:'#16a34a'},
+  {v:2, label:'とても楽', c:'#16a34a'},
+  {v:3, label:'楽', c:'#65a30d'},
+  {v:4, label:'やや楽', c:'#65a30d'},
+  {v:5, label:'ややきつい', c:'#ca8a04'},
+  {v:6, label:'きつい手前', c:'#ca8a04'},
+  {v:7, label:'きつい', c:'#ea580c'},
+  {v:8, label:'とてもきつい', c:'#dc2626'},
+  {v:9, label:'ほぼ限界', c:'#dc2626'},
+  {v:10,label:'限界', c:'#991b1b'},
+];
+
+// 機種によって出る数値が違う（ワットが出ないエルゴが普通にある）。単位は記録ごとに持つ
+function getBikeUnit(){ return localStorage.getItem(LS_KEY_BIKE_UNIT)==='RPM' ? 'RPM' : 'W'; }
+function bikeUnitOf(b){ return b && b.unit==='RPM' ? 'RPM' : 'W'; }
+function emptyBike(){
+  return { unit:getBikeUnit(), w:[null,null,null,null], lv:[null,null,null,null], hr:[null,null,null,null], z4m:null, z4s:null, rpe:null };
+}
+function bikeNum(v){
+  if(v===null || v==='' || v===undefined) return null;
+  const n = Number(v);
+  return (isFinite(n) && n>0) ? n : null;
+}
+function bikeInt(v, lo, hi){
+  const n = Number(v);
+  return (v!==null && v!=='' && v!==undefined && isFinite(n) && Number.isInteger(n) && n>=lo && n<=hi) ? n : null;
+}
+function bikeHr(v){
+  const n = bikeNum(v);
+  return (n!==null && n>=BIKE_HR_MIN && n<=BIKE_HR_MAX) ? n : null;
+}
+function bikeAvg(b){
+  if(!b || !Array.isArray(b.w)) return null;
+  const v = b.w.map(bikeNum).filter(x=>x!==null);
+  if(!v.length) return null;
+  return Math.round(v.reduce((s,x)=>s+x,0)/v.length);
+}
+// 負荷レベルは本ごとに記録する。揃っているときだけ「そのセッションのレベル」として比較に使う
+function bikeLvList(b){
+  if(!b || !Array.isArray(b.lv)) return [];
+  return b.lv.map(x=>bikeInt(x,1,40)).filter(x=>x!==null);
+}
+function bikeLevelOf(b){
+  const v = bikeLvList(b);
+  if(v.length) return v.every(x=>x===v[0]) ? v[0] : null;
+  return b ? bikeNum(b.level) : null;   // ハムリハ旧形式（セッションに1つ）
+}
+function bikeLevelMixed(b){
+  const v = bikeLvList(b);
+  return v.length>1 && !v.every(x=>x===v[0]);
+}
+function bikeLevelLabel(b){
+  const v = bikeLvList(b);
+  if(!v.length){ const old = b ? bikeNum(b.level) : null; return old ? 'L'+old : ''; }
+  return bikeLevelMixed(b) ? `L${Math.min(...v)}→${Math.max(...v)}` : 'L'+v[0];
+}
+// 各本の終盤心拍。セッション全体の平均はウォームアップ・レストで薄まるので使わない
+function bikeHrList(b){
+  if(!b || !Array.isArray(b.hr)) return [];
+  return b.hr.map(bikeHr).filter(x=>x!==null);
+}
+function bikeHrMaxOf(b){
+  const v = bikeHrList(b);
+  if(v.length) return Math.max(...v);
+  return b ? bikeHr(b.hrMax) : null;   // ハムリハ旧形式
+}
+function bikeHrAvgOf(b){
+  const v = bikeHrList(b);
+  if(v.length) return Math.round(v.reduce((a,x)=>a+x,0)/v.length);
+  return b ? bikeHr(b.hrAvg) : null;   // ハムリハ旧形式
+}
+function fmtMS(sec){
+  if(sec===null) return '—';
+  return Math.floor(sec/60) + ':' + String(sec%60).padStart(2,'0');
+}
+function fmtDeltaMS(sec){
+  const sign = sec<0 ? '-' : '+';
+  const a = Math.abs(sec);
+  return sign + Math.floor(a/60) + ':' + String(a%60).padStart(2,'0');
+}
+// ガーミンの表示が mm:ss なので、分と秒で受け取る
+function bikeZ4Secs(b){
+  if(!b) return null;
+  const m = bikeInt(b.z4m, 0, 60), sec = bikeInt(b.z4s, 0, 59);
+  if(m===null && sec===null){
+    const old = Number(b.z4);   // ハムリハ旧形式: 小数の分
+    return (b.z4!==null && b.z4!==undefined && b.z4!=='' && isFinite(old) && old>0) ? Math.round(old*60) : null;
+  }
+  const total = (m||0)*60 + (sec||0);
+  return total>0 ? total : null;
+}
+// 4本目が1本目から5%以上落ちていたら強度設定が高すぎる（1本目を飛ばしている）
+function bikeFade(b){
+  if(!b || !Array.isArray(b.w)) return null;
+  const first = bikeNum(b.w[0]), last = bikeNum(b.w[3]);
+  if(first===null || last===null) return null;
+  return last < first*0.95;
+}
+
+// 保存済みのバイク記録（日付昇順）。本数が1本も入っていない記録は数えない。
+// excludeId は編集中の記録自身を比較対象から外すため。
+function bikeSessions(excludeId){
+  return getSessions()
+    .filter(s=>s.type==='cardio' && s.cardio==='bike' && s.bike && s.date && s.id!==excludeId)
+    .map(s=>({ds:s.date, id:s.id, unit:bikeUnitOf(s.bike), avg:bikeAvg(s.bike),
+      level:bikeLevelOf(s.bike), levelLabel:bikeLevelLabel(s.bike),
+      hrMax:bikeHrMaxOf(s.bike), hrAvg:bikeHrAvgOf(s.bike), z4:bikeZ4Secs(s.bike)}))
+    .filter(x=>x.avg!==null)
+    .sort((a,b)=>a.ds.localeCompare(b.ds) || String(a.id).localeCompare(String(b.id)));
+}
+// ctx = { date, excludeId }。比較は「その日より前」かつ「同じ単位」の記録とだけ行う
+function bikePrevSess(b, ctx){
+  const unit = bikeUnitOf(b);
+  return bikeSessions(ctx.excludeId).filter(x=>x.ds < ctx.date && x.unit===unit).pop() || null;
+}
+// 平均心拍・Z4は同じレベルの回とだけ比較できる（負荷が違えば心拍が違って当然）
+function bikePrevSameLevel(b, ctx, key){
+  const lv = bikeLevelOf(b);
+  if(!lv) return null;
+  const unit = bikeUnitOf(b);
+  const past = bikeSessions(ctx.excludeId).filter(x=>x.ds < ctx.date && x.unit===unit && x.level===lv && x[key||'hrAvg']);
+  return past.length ? past[past.length-1] : null;
+}
+function bikeDeltaText(avg, prev){
+  if(avg===null || !prev) return '';
+  const d = avg - prev.avg;
+  return `前回 ${prev.avg} → ${d>0?'+':''}${d}`;
+}
+function bikeFadeHtml(b){
+  const fade = bikeFade(b);
+  if(fade===null) return '';
+  const rpm = bikeUnitOf(b)==='RPM';
+  if(fade) return `<div class="bike-fade warn">⚠️ 4本目が1本目から5%以上落ちています。強度設定が高すぎるので、次回は${rpm?'レベルを1':'5〜10W'}下げてください。</div>`;
+  return `<div class="bike-fade ok">✅ 4本目まで維持できています。次回は${rpm?'レベルを1':'5W'}上げて試す余地あり。</div>`;
+}
+// レベルが変わると RPM は前回と比較できない。黙って並べると改善/悪化を誤読するので明示する
+function bikeLevelWarnHtml(b, prev){
+  if(bikeUnitOf(b)!=='RPM') return '';
+  if(bikeLevelMixed(b)) return `<div class="bike-fade warn">本ごとにレベルが違います（${bikeLevelLabel(b)}）。<b>この回は他の回と比較できません</b>。適正値が決まったら、次回から4本とも同じレベルで回してください。</div>`;
+  const lv = bikeLevelOf(b);
+  if(lv===null || !prev || !prev.level || lv===prev.level) return '';
+  return `<div class="bike-fade warn">⚠️ 前回はレベル${prev.level}、今回はレベル${lv}です。<b>RPMは前回と比較できません</b>。ここから新しい基準として数え直してください。</div>`;
+}
+// バイク用の最高心拍はランより5〜10bpm低く出るので、記録した全回の最高値を基準にする
+function bikeHrNoteHtml(b, ctx){
+  const hrMax = bikeHrMaxOf(b), hrAvg = bikeHrAvgOf(b), lv = bikeLevelOf(b);
+  if(hrMax===null && hrAvg===null){
+    return `<span class="sub">RPMを読むのと<b>同じ瞬間（残り10〜15秒）にウォッチの心拍</b>を読んで入れてください。1本目は心拍が立ち上がりきらず低く出るのが正常です。</span>`;
+  }
+  let h = '';
+  if(hrMax!==null){
+    const others = bikeSessions(ctx.excludeId).map(x=>x.hrMax).filter(x=>x);
+    const ref = others.length ? Math.max(...others) : null;
+    if(ref===null || hrMax>=ref){
+      h += `<div>最高 <b>${hrMax}</b> bpm — <b>これがバイク用の基準心拍</b>になります。</div>`;
+    }else{
+      const pct = Math.round(hrMax/ref*100);
+      const ok = pct>=90;
+      h += `<div>最高 <b>${hrMax}</b> bpm <span class="bike-pill" style="background:${ok?'#16a34a':'#ca8a04'}">基準の${pct}%</span> ${ok?'狙いどおりです。':'— 追い込みきれていません。次回レベルを1上げてください。'}</div>`;
+    }
+  }
+  if(hrAvg!==null){
+    const prev = bikePrevSameLevel(b, ctx, 'hrAvg');
+    if(prev){
+      const d = hrAvg - prev.hrAvg;
+      const msg = d<0 ? '同じ負荷で心拍が下がっています。改善のサインです。'
+                : d>0 ? '同じ負荷で心拍が上がっています。疲労・睡眠・暑さの影響かもしれません。'
+                : '前回と同じです。';
+      h += `<div style="margin-top:4px">平均 <b>${hrAvg}</b> bpm（レベル${lv}の前回 ${prev.hrAvg} → ${d>0?'+':''}${d}）— <span class="sub">${msg}</span></div>`;
+    }else{
+      const why = lv ? `— レベル${lv}での比較対象がまだありません。`
+        : bikeLevelMixed(b) ? '— 本ごとにレベルが違うため、他の回とは比較できません。'
+        : '— 負荷レベルも入れると次回から比較できます。';
+      h += `<div style="margin-top:4px">平均 <b>${hrAvg}</b> bpm <span class="sub">${why}</span></div>`;
+    }
+  }
+  return h;
+}
+// Z4滞在時間は「同じレベルで減ったら負荷を上げる合図」。
+// 体力がつくと同じ負荷では高ゾーンに入らなくなり、ただのきつめの有酸素に変質するため
+function bikeZ4NoteHtml(b, ctx){
+  const z4 = bikeZ4Secs(b), lv = bikeLevelOf(b);
+  const lo = BIKE_Z4_TARGET_SEC[0], hi = BIKE_Z4_TARGET_SEC[1];
+  if(z4===null) return `<span class="sub">任意。ガーミンのゾーン4以上の合計時間を、表示どおり分・秒で入れてください。目安は <b>${fmtMS(lo)}〜${fmtMS(hi)}</b>。</span>`;
+  let h = z4 < lo
+    ? `<div><b>${fmtMS(z4)}</b> — 目安の${fmtMS(lo)}に届いていません。強度が足りないか、1本ごとの立ち上がりが遅れています。</div>`
+    : `<div><b>${fmtMS(z4)}</b> — 目安（${fmtMS(lo)}〜${fmtMS(hi)}）に入っています。</div>`;
+  const prev = bikePrevSameLevel(b, ctx, 'z4');
+  if(prev){
+    const d = z4 - prev.z4;
+    if(d < -30) h += `<div style="margin-top:4px" class="sub">レベル${lv}の前回 ${fmtMS(prev.z4)} → ${fmtDeltaMS(d)}。<b>同じレベルで滞在時間が減っています＝体力がついた分、刺激が落ちています。レベルを1上げてください。</b></div>`;
+    else if(d > 30) h += `<div style="margin-top:4px" class="sub">レベル${lv}の前回 ${fmtMS(prev.z4)} → ${fmtDeltaMS(d)}。滞在時間を保てています。</div>`;
+    else h += `<div style="margin-top:4px" class="sub">レベル${lv}の前回 ${fmtMS(prev.z4)} とほぼ同じです。</div>`;
+  }
+  return h;
+}
+function bikeRpeNoteHtml(v){
+  const info = BIKE_RPE.find(r=>r.v===v);
+  if(!info) return `<span class="sub">4×4の狙いは <b>8〜9</b>（最後の1分で会話不能）。終わって「あと1本行けた」くらいが正解。</span>`;
+  let advice;
+  if(v<=6) advice = ' — 刺激が足りません。次回レベルを1〜2上げてください。';
+  else if(v===7) advice = ' — あと少し。次回レベルを1上げてみてください。';
+  else if(v===10) advice = ' — 追い込みすぎです。4本目まで同じ強度で回せません。次回レベルを1下げてください。';
+  else advice = ' — 狙いどおりです。';
+  return `<span style="color:${info.c};font-weight:700">${v} ${info.label}</span><span class="sub">${advice}</span>`;
+}
+// 入力中に再描画するとフォーカスが飛ぶので、判定文だけを差し替えられるように部品で返す
+function bikeLiveParts(b, ctx){
+  const avg = bikeAvg(b), unit = bikeUnitOf(b);
+  const prev = bikePrevSess(b, ctx);
+  return {
+    avg: avg===null ? '—' : `${avg} ${unit}`,
+    delta: bikeDeltaText(avg, prev),
+    fade: bikeFadeHtml(b),
+    lvWarn: bikeLevelWarnHtml(b, prev),
+    hr: bikeHrNoteHtml(b, ctx),
+    z4: bikeZ4NoteHtml(b, ctx),
+    rpe: bikeRpeNoteHtml(bikeNum(b.rpe)),
+    prevLevel: prev && prev.levelLabel ? `前回 ${prev.levelLabel}` : '適正値が決まったら4本とも同じに'
+  };
+}
+// mode: 'log'（記録タブ）| 'edit'（履歴の編集）
+function renderBikeInputs(b, ctx, mode){
+  const p = bikeLiveParts(b, ctx), unit = bikeUnitOf(b);
+  const grid = (field, lo, hi, val)=>`<div class="bike-grid">${[0,1,2,3].map(i=>`
+      <label class="bike-cell"><span>本${i+1}</span>
+        <input type="number" inputmode="numeric" min="${lo}" max="${hi}" step="1" class="bk-in" data-mode="${mode}" data-f="${field}" data-i="${i}" value="${val(i)??''}"></label>`).join('')}</div>`;
+  return `<div class="bike-box">
+    <div class="bike-head"><div class="bike-label">VO2MAX トラック — 4分×4本</div>
+      <div class="bike-unit">
+        <button class="bk-unit${unit==='W'?' sel':''}" data-mode="${mode}" data-unit="W">ワット</button>
+        <button class="bk-unit${unit==='RPM'?' sel':''}" data-mode="${mode}" data-unit="RPM">RPM</button>
+      </div></div>
+    ${grid('w', 0, 2000, i=>bikeNum(b.w[i]))}
+    ${unit==='RPM'?`<p class="sub" style="margin-top:7px"><b>各本の残り10〜15秒の瞬間RPM</b>を入れてください。<b>毎回同じタイミングで読むこと</b>だけが重要です。</p>`:''}
+    <div class="bike-avg">平均 <b id="${mode}-bk-avg">${p.avg}</b><span class="sub" id="${mode}-bk-delta">${p.delta}</span></div>
+    <div id="${mode}-bk-fade">${p.fade}</div>
+    <div class="bike-sub">各本の負荷レベル<span class="sub" id="${mode}-bk-prevlv"> — ${p.prevLevel}</span></div>
+    ${grid('lv', 1, 40, i=>bikeInt(b.lv&&b.lv[i],1,40))}
+    <div id="${mode}-bk-lvwarn">${p.lvWarn}</div>
+    <div class="bike-sub">各本の終盤心拍 (bpm)<span class="sub"> — RPMと同じ瞬間にウォッチを見る</span></div>
+    ${grid('hr', BIKE_HR_MIN, BIKE_HR_MAX, i=>bikeHr(b.hr&&b.hr[i]))}
+    <div class="bike-note" id="${mode}-bk-hr">${p.hr}</div>
+    <div class="bike-z4"><span>ゾーン4以上</span>
+      <input type="number" inputmode="numeric" min="0" max="60" step="1" class="bk-in" data-mode="${mode}" data-f="z4m" value="${bikeInt(b.z4m,0,60)??''}"><span class="sub">分</span>
+      <input type="number" inputmode="numeric" min="0" max="59" step="1" class="bk-in" data-mode="${mode}" data-f="z4s" value="${bikeInt(b.z4s,0,59)??''}"><span class="sub">秒</span></div>
+    <div class="bike-note" id="${mode}-bk-z4">${p.z4}</div>
+    <div class="bike-sub">主観強度 RPE<span class="sub">（狙い 8〜9）</span></div>
+    <div class="bk-rpe-row">${BIKE_RPE.map(r=>{
+      const sel = bikeNum(b.rpe)===r.v;
+      return `<button class="bk-rpe${sel?' sel':''}" data-mode="${mode}" data-v="${r.v}" style="${sel?`background:${r.c};color:#fff`:''}">${r.v}</button>`;
+    }).join('')}</div>
+    <div class="bike-note">${p.rpe}</div>
+    <p class="sub" style="margin-top:8px">${unit==='RPM'?'<b>レベルを固定したままRPMを記録</b>してください。レベルが変わるとRPMは比較できなくなります。':'ワットが出る機種はワットのまま。レベルは参考として記録します。'}</p>
+  </div>`;
+}
+function refreshBikeFeedback(mode, b, ctx){
+  const p = bikeLiveParts(b, ctx);
+  const set = (k, v, html)=>{ const el = document.getElementById(`${mode}-bk-${k}`); if(el){ if(html) el.innerHTML = v; else el.textContent = v; } };
+  set('avg', p.avg); set('delta', p.delta); set('prevlv', ' — ' + p.prevLevel);
+  set('fade', p.fade, true); set('lvwarn', p.lvWarn, true); set('hr', p.hr, true); set('z4', p.z4, true);
+}
+// 入力欄の値を bike オブジェクトへ。範囲外は null にして判定を壊さない
+function setBikeField(b, f, i, val){
+  if(f==='w') b.w[i] = bikeNum(val);
+  else if(f==='lv'){ if(!Array.isArray(b.lv)) b.lv=[null,null,null,null]; b.lv[i] = bikeInt(val,1,40); b.level = null; }
+  else if(f==='hr'){ if(!Array.isArray(b.hr)) b.hr=[null,null,null,null]; b.hr[i] = bikeHr(val); b.hrMax = null; b.hrAvg = null; }
+  else if(f==='z4m'){ b.z4m = bikeInt(val,0,60); b.z4 = null; }
+  else if(f==='z4s'){ b.z4s = bikeInt(val,0,59); b.z4 = null; }
+}
+function bikeSummaryLabel(b){
+  const avg = bikeAvg(b);
+  if(avg===null) return '';
+  const parts = [`平均${avg}${bikeUnitOf(b)}`];
+  const lv = bikeLevelLabel(b); if(lv) parts.push(lv);
+  const hr = bikeHrMaxOf(b); if(hr) parts.push(`最高心拍${hr}`);
+  const rpe = bikeNum(b.rpe); if(rpe) parts.push(`RPE${rpe}`);
+  return parts.join(' ');
+}
+function renderBikeDetail(s){
+  const b = s.bike || {};
+  const unit = bikeUnitOf(b);
+  const ctx = { date:s.date, excludeId:s.id };
+  const p = bikeLiveParts(b, ctx);
+  const cell = (arr, i, fn)=>{ const v = Array.isArray(arr) ? fn(arr[i]) : null; return v==null ? '—' : v; };
+  const rows = [0,1,2,3].map(i=>`<tr><td>本${i+1}</td><td>${cell(b.w,i,bikeNum)}</td><td>${cell(b.lv,i,x=>bikeInt(x,1,40))}</td><td>${cell(b.hr,i,bikeHr)}</td></tr>`).join('');
+  return `<div class="card">
+    <h2>🚴 4×4 の内訳</h2>
+    <table class="bike-table"><tr><th></th><th>${unit}</th><th>レベル</th><th>心拍</th></tr>${rows}</table>
+    <div class="bike-avg">平均 <b>${p.avg}</b><span class="sub">${p.delta}</span></div>
+    ${p.fade}${p.lvWarn}
+    <div class="bike-note">${p.hr}</div>
+    <div class="bike-note">${p.z4}</div>
+    <div class="bike-note">${p.rpe}</div>
+  </div>`;
+}
+// 推移: 直近の単位の記録だけ並べる（ワットとRPMを同じ棒で比べない）
+function renderBikeTrendCard(){
+  const all = bikeSessions();
+  if(!all.length) return '';
+  const unit = all[all.length-1].unit;
+  const sess = all.filter(x=>x.unit===unit);
+  const shown = sess.slice(-12);
+  const max = Math.max(...shown.map(s=>s.avg));
+  const first = sess[0], last = sess[sess.length-1];
+  let h = `<div class="card"><h2>🚴 バイク4×4 の推移 <span class="sub">${sess.length}回</span></h2>
+    <div class="sub" style="margin-bottom:8px">同じ主観強度・同じ負荷レベルで数値が上がっていれば VO2max は伸びています。run-walk 主体の期間はガーミンの推定VO2maxが更新されないので、判定はこの数値で行ってください。</div>`;
+  shown.forEach((s,i)=>{
+    const before = i>0 ? shown[i-1] : null;
+    const changed = unit==='RPM' && s.level && before && before.level && s.level!==before.level;
+    h += `<div class="bike-row">
+      <span class="bike-date">${escapeHtml(s.ds.slice(5).replace('-','/'))}</span>
+      <span class="bike-bar"><span style="width:${max?Math.round(s.avg/max*100):0}%"></span></span>
+      <span class="bike-w">${s.avg} ${unit}</span>
+      <span class="bike-tag">${s.levelLabel?(changed?'⚠️':'')+s.levelLabel:''}</span>
+      <span class="bike-tag">${s.hrAvg?'♥'+s.hrAvg:''}</span>
+    </div>`;
+  });
+  if(sess.length>=2){
+    const comparable = unit==='W' || !first.level || !last.level || first.level===last.level;
+    if(comparable){
+      const d = last.avg - first.avg;
+      const pct = first.avg ? Math.round(d/first.avg*1000)/10 : 0;
+      h += `<div class="sub" style="margin-top:8px">初回 ${first.avg} ${unit} → 直近 ${last.avg} ${unit}（${d>0?'+':''}${d} ${unit} / ${pct>0?'+':''}${pct}%）</div>`;
+    }else{
+      h += `<div class="sub" style="margin-top:8px">初回はレベル${first.level}、直近はレベル${last.level}のため通算の比較は出していません。同じレベルの回どうしで見てください。</div>`;
+    }
+  }
+  if(sess.length < all.length) h += `<div class="sub" style="margin-top:4px">${unit==='W'?'RPM':'ワット'}で記録した${all.length-sess.length}回は単位が違うため除いています。</div>`;
+  return h + `</div>`;
+}
+
+/* ハムリハ（hamrehab_v1）のバイク記録を有酸素記録として取り込む。
+   id を日付から決めるので、何度取り込んでも重複しない。 */
+function hamrehabBikeSessions(obj){
+  if(!obj || typeof obj!=='object' || Array.isArray(obj) || !obj.days || typeof obj.days!=='object') return null;
+  const unit = obj.bikeUnit==='RPM' ? 'RPM' : 'W';
+  return Object.keys(obj.days).filter(ds=>/^\d{4}-\d{2}-\d{2}$/.test(ds)).sort().map(ds=>{
+    const d = obj.days[ds];
+    const b = d && d.bike;
+    if(!b || typeof b!=='object' || bikeAvg(b)===null) return null;
+    return {
+      id: 'hamrehab-bike-' + ds, type:'cardio', date:ds, cardio:'bike',
+      pain: (typeof d.pain==='number') ? d.pain : null,
+      cardioMin:null, cardioKm:null,
+      bike: Object.assign({}, b, { unit })
+    };
+  }).filter(Boolean);
+}
+function mergeHamrehabBike(obj){
+  const list = hamrehabBikeSessions(obj);
+  if(list===null) return null;
+  const sessions = getSessions();
+  const have = new Set(sessions.map(s=>s.id));
+  const add = list.filter(s=>!have.has(s.id));
+  if(add.length){
+    sessions.push(...add);
+    sessions.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    saveSessions(sessions);
+  }
+  if(add.length && !localStorage.getItem(LS_KEY_BIKE_UNIT) && obj.bikeUnit==='RPM') localStorage.setItem(LS_KEY_BIKE_UNIT, 'RPM');
+  return { added:add.length, total:list.length };
+}
+// 同じ github.io のオリジンなので、Safari で両方を開いていればハムリハの記録がそのまま読める。
+// 初回だけ自動で取り込む（後で記録を消したときに復活させないため）。
+// iPhoneのホーム画面アプリは保存領域が別なので、そちらは設定タブの貼り付けで取り込む。
+function autoImportHamrehabBike(){
+  try{
+    if(localStorage.getItem(LS_KEY_HAMREHAB_IMPORTED)) return;
+    const raw = localStorage.getItem(HAMREHAB_KEY);
+    if(!raw) return;
+    const r = mergeHamrehabBike(JSON.parse(raw));
+    if(r && r.total) localStorage.setItem(LS_KEY_HAMREHAB_IMPORTED, todayStr());
+  }catch(e){ /* 読めなければ手動取り込みに任せる */ }
+}
+function renderHamrehabImportCard(){
+  return `<div class="card">
+    <h2>🚴 ハムリハのバイク記録を取り込む</h2>
+    <div class="sub" style="margin-bottom:8px">バイク4×4の記録はこのアプリに移しました。ハムリハの「記録」タブ →「書き出してコピー」で出たJSONを貼り付けてください。同じ日の記録は二重に入りません。</div>
+    <textarea id="inputHamrehab" placeholder='{"phase":3,"runSession":7,"days":{...}}'></textarea>
+    <button class="btn btn-secondary" id="btnImportHamrehab" style="margin-top:8px">バイク記録を取り込む</button>
+    <div id="hamrehabMsg" class="center-msg" style="display:none"></div>
+  </div>`;
 }
 
 /* ===== 折れ線グラフ ===== */
@@ -1202,7 +1637,7 @@ function renderTrends(){
   const fat = logs.filter(b=>b.fat!=null).map(b=>({date:b.date, value:b.fat}));
 
   // 体重・体脂肪率は HealthTracker に一本化した
-  let html = renderWeeklyVolumeCard() + render1RMCard();
+  let html = renderWeeklyVolumeCard() + render1RMCard() + renderBikeTrendCard();
   html += `<div class="card">
     <h2>⚖️ 体重・体脂肪率</h2>
     <div class="sub" style="margin-bottom:10px">体重と体脂肪率は HealthTracker で記録・確認します。</div>
@@ -1239,11 +1674,11 @@ function buildShareText(s){
   if(!s) return '';
   let out = `🏋️ ${s.date||''} のトレーニング\n`;
   if(s.type==='cardio'){
-    out += `\n${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}${cardioDetailLabel(s)}\n`;
+    out += `\n${cardioName(s.cardio)}${cardioDetailLabel(s)}\n`;
     return out;
   }
   if(s.cardio && s.cardio!=='none'){
-    out += `${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}${cardioDetailLabel(s)}\n`;
+    out += `${cardioName(s.cardio)}${cardioDetailLabel(s)}\n`;
   }
   (s.exercises||[]).forEach(ex=>{
     out += `\n■ ${ex.name}\n`;
@@ -1263,7 +1698,7 @@ function drawShareImage(s){
   const SC = 2, W = 640, PAD = 34;
   const rows = [];
   if(s.type==='cardio'){
-    rows.push({t:'ex', text: (s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング') + cardioDetailLabel(s)});
+    rows.push({t:'ex', text: cardioName(s.cardio) + cardioDetailLabel(s)});
   } else {
     (s.exercises||[]).forEach(ex=>{
       rows.push({t:'ex', text: ex.name});
@@ -1307,7 +1742,7 @@ function drawShareImage(s){
   if(cardioH){
     ctx.fillStyle = '#6b7a89';
     ctx.font = `400 20px ${FONT}`;
-    ctx.fillText(`${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}${cardioDetailLabel(s)}`, PAD, y);
+    ctx.fillText(`${cardioName(s.cardio)}${cardioDetailLabel(s)}`, PAD, y);
     y += cardioH;
   }
   y += 6;
@@ -1373,7 +1808,9 @@ function renderEditForm(d){
     <div class="field" style="margin-bottom:0">
       <label>有酸素運動</label>
       <div class="seg">`;
-  if(isCardioOnly){
+  if(isCardioOnly && d.cardio === 'bike'){
+    html += `<button class="sel">バイク4×4</button>`;
+  } else if(isCardioOnly){
     html += `<button data-cardio="walk" class="ed-cardio-btn${d.cardio==='walk'?' sel':''}">ウォーキング</button>
       <button data-cardio="run" class="ed-cardio-btn${d.cardio==='run'?' sel':''}">ランニング</button>`;
   } else {
@@ -1382,8 +1819,12 @@ function renderEditForm(d){
       <button data-cardio="walk" class="ed-cardio-btn${cur==='walk'?' sel':''}">ウォーキング</button>
       <button data-cardio="run" class="ed-cardio-btn${cur==='run'?' sel':''}">ランニング</button>`;
   }
-  html += `</div></div>
-  </div>`;
+  html += `</div></div>`;
+  if(isCardioOnly && d.cardio === 'bike'){
+    if(!d.bike) d.bike = emptyBike();
+    html += renderBikeInputs(d.bike, { date: d.date, excludeId: d.id }, 'edit');
+  }
+  html += `</div>`;
 
   if(!isCardioOnly){
     html += `<div class="card">
@@ -1525,7 +1966,8 @@ function renderHistory(){
     const s = state.viewingSession;
     let html = `<div class="card"><span class="detail-close" id="btnCloseDetail">閉じる ✕</span><div style="clear:both"></div></div>`;
     if(s.type==='cardio'){
-      html += `<div class="card"><h2>${s.cardio==='run'?'🏃 ランニング':'🚶 ウォーキング'}${escapeHtml(cardioDetailLabel(s))}</h2><div class="sub">${escapeHtml(s.date||'')}　有酸素運動の記録</div></div>`;
+      html += `<div class="card"><h2>${cardioName(s.cardio)}${escapeHtml(cardioDetailLabel(s))}</h2><div class="sub">${escapeHtml(s.date||'')}　有酸素運動の記録</div></div>`;
+      if(s.cardio === 'bike' && s.bike) html += renderBikeDetail(s);
       html += renderShareCard();
     } else {
       html += renderResult(s, false);
@@ -1550,10 +1992,10 @@ function renderHistory(){
   }
   html += '<div class="card">';
   shown.slice().reverse().forEach(s=>{
-    const cardioIcon = s.cardio==='run' ? '🏃' : (s.cardio==='walk' ? '🚶' : '');
+    const cardioIcon = CARDIO_ICONS[s.cardio] || '';
     let summary;
     if(s.type==='cardio'){
-      summary = escapeHtml(`有酸素: ${s.cardio==='run'?'ランニング':'ウォーキング'}${cardioDetailLabel(s)}`);
+      summary = escapeHtml(`有酸素: ${CARDIO_LABELS[s.cardio]||s.cardio}${cardioDetailLabel(s)}`);
     } else {
       const names = (s.exercises||[]).map(e=>e.name).join('、');
       const nextFocus = s.next_menu ? `　→次回: ${s.next_menu.focus||''}` : '';
@@ -1622,7 +2064,7 @@ function renderCalendar(sessions){
     let marks = '';
     if(rec){
       if(rec.strength) marks += `<span class="dot dot-strength"></span>`;
-      if(rec.cardio) marks += `<span class="dot ${rec.cardio==='run'?'dot-run':'dot-walk'}"></span>`;
+      if(rec.cardio) marks += `<span class="dot dot-${escapeAttr(rec.cardio)}"></span>`;
     }
     html += `<div class="cal-cell${rec?' has-rec':''}${isToday?' today':''}"${rec?` data-date="${dateStr}"`:''}>
       <div class="cal-day">${day}</div>
@@ -1634,6 +2076,7 @@ function renderCalendar(sessions){
       <span><span class="dot dot-strength"></span>筋トレ ${cntStrength}日</span>
       <span><span class="dot dot-run"></span>ランニング</span>
       <span><span class="dot dot-walk"></span>ウォーキング</span>
+      <span><span class="dot dot-bike"></span>バイク</span>
       <span class="cal-legend-total">有酸素 ${cntCardio}日</span>
     </div>
   </div>`;
@@ -1667,6 +2110,7 @@ function renderSettings(){
   </div>
   ${renderVolumeTargetCard()}
   ${renderCustomExCard()}
+  ${renderHamrehabImportCard()}
   ${renderBackupCard()}`;
 }
 
@@ -1835,9 +2279,61 @@ function bindEvents(){
       if(mn) state.cardioMin = mn.value;
       if(km) state.cardioKm = km.value;
       state.cardio = b.dataset.cardio;
+      state.cardioError = null;
       render();
     };
   });
+
+  // バイク4×4の入力（記録タブ・履歴の編集で共通）。入力中は判定文だけ差し替える
+  const bikeTarget = (mode)=> mode === 'edit'
+    ? { b: state.editDraft && state.editDraft.bike, ctx: state.editDraft && { date: state.editDraft.date, excludeId: state.editDraft.id } }
+    : { b: state.bikeDraft, ctx: { date: state.cardioLogDate || todayStr() } };
+  document.querySelectorAll('.bk-in').forEach(el=>{
+    el.oninput = ()=>{
+      const t = bikeTarget(el.dataset.mode);
+      if(!t.b) return;
+      setBikeField(t.b, el.dataset.f, +el.dataset.i, el.value);
+      refreshBikeFeedback(el.dataset.mode, t.b, t.ctx);
+      if(el.dataset.mode === 'log') saveDraft();
+    };
+  });
+  const keepEditDate = (mode)=>{ if(mode === 'edit') state.editDraft = collectEditDraft(); };
+  document.querySelectorAll('.bk-unit').forEach(b=>{
+    b.onclick = ()=>{
+      keepEditDate(b.dataset.mode);
+      const t = bikeTarget(b.dataset.mode);
+      if(!t.b) return;
+      t.b.unit = b.dataset.unit === 'RPM' ? 'RPM' : 'W';
+      if(b.dataset.mode === 'log') localStorage.setItem(LS_KEY_BIKE_UNIT, t.b.unit);
+      render();
+    };
+  });
+  document.querySelectorAll('.bk-rpe').forEach(b=>{
+    b.onclick = ()=>{
+      keepEditDate(b.dataset.mode);
+      const t = bikeTarget(b.dataset.mode);
+      if(!t.b) return;
+      const v = +b.dataset.v;
+      t.b.rpe = (bikeNum(t.b.rpe) === v) ? null : v;   // 同じ数字をもう一度押したら取り消す
+      render();
+    };
+  });
+
+  const btnImportHamrehab = document.getElementById('btnImportHamrehab');
+  if(btnImportHamrehab) btnImportHamrehab.onclick = ()=>{
+    const ta = document.getElementById('inputHamrehab');
+    const msg = document.getElementById('hamrehabMsg');
+    const show = (text, ok)=>{ if(!msg) return; msg.textContent = text; msg.style.color = ok ? 'var(--ok)' : 'var(--danger)'; msg.style.display = 'block'; };
+    let obj;
+    try{ obj = JSON.parse(extractJsonObject(ta ? ta.value : '') || ''); }
+    catch(e){ show('JSONとして読み取れません。貼り付けが途中で切れていないか確認してください。', false); return; }
+    const r = mergeHamrehabBike(obj);
+    if(r === null){ show('ハムリハの書き出しデータではありません。', false); return; }
+    if(r.total === 0){ show('バイク4×4の記録が1件もありませんでした。', false); return; }
+    localStorage.setItem(LS_KEY_HAMREHAB_IMPORTED, todayStr());
+    if(ta) ta.value = '';
+    show(r.added ? `✓ ${r.added}件を取り込みました（全${r.total}件中、残りは取り込み済み）` : `すべて取り込み済みです（${r.total}件）`, true);
+  };
 
   const cardioMin = document.getElementById('cardioMin');
   if(cardioMin) cardioMin.oninput = ()=>{ state.cardioMin = cardioMin.value; };
@@ -1858,7 +2354,12 @@ function bindEvents(){
   const btnLogCardio = document.getElementById('btnLogCardio');
   if(btnLogCardio) btnLogCardio.onclick = ()=>{
     if(state.cardio==='none'){
-      state.error = '「なし」以外（ウォーキング or ランニング）を選んでから記録してください。';
+      state.cardioError = '「なし」以外（ウォーキング・ランニング・バイク4×4）を選んでから記録してください。';
+      render();
+      return;
+    }
+    if(state.cardio==='bike' && bikeAvg(state.bikeDraft)===null){
+      state.cardioError = 'バイク4×4は、各本の数値を1本以上入れてから記録してください。';
       render();
       return;
     }
@@ -1871,16 +2372,17 @@ function bindEvents(){
         cardio: state.cardio,
         pain: state.pain != null ? state.pain : null,
         cardioMin: numOrNull(state.cardioMin),
-        cardioKm: numOrNull(state.cardioKm)
+        cardioKm: state.cardio==='bike' ? null : numOrNull(state.cardioKm)
       };
+      if(state.cardio==='bike') entry.bike = JSON.parse(JSON.stringify(state.bikeDraft));
       sessions.push(entry);
       sessions.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
       saveSessions(sessions);
       // 続けて押しても二重に登録されないよう、有酸素の入力だけリセットする
       // （筋トレの入力を退避してから、有酸素だけを消して再描画する）
       capturePendingInputs();
-      state.cardio = 'none'; state.cardioMin = null; state.cardioKm = null;
-      state.error = null;
+      state.cardio = 'none'; state.cardioMin = null; state.cardioKm = null; state.bikeDraft = null;
+      state.error = null; state.cardioError = null;
       render({ skipCapture: true });
       const msg = document.getElementById('cardioLogSaved');
       if(msg){ msg.style.display = 'block'; setTimeout(()=>{ msg.style.display = 'none'; }, 1800); }
@@ -2452,10 +2954,10 @@ function buildPrompt(gymId, cardio, workoutText, pain){
   }
   const gymName = GYM_NAMES[gymId];
   const gymEquip = getGymEquip(gymId);
-  const cardioLabel = CARDIO_LABELS[(cardioSummaryForDate(todayStr()) || {}).cardio] || 'なし';
+  const cardioLabel = (cardioSummaryForDate(todayStr()) || {}).label || 'なし';
   const painLabel = (pain != null) ? String(pain) : '未記録';
   const todayCardio = cardioSummaryForDate(todayStr());
-  const cardioAmountLabel = todayCardio ? cardioDetailLabel(todayCardio) : '';
+  const cardioAmountLabel = todayCardio ? cardioDetailLabel(todayCardio) + (todayCardio.bikeLabel ? `（バイク: ${todayCardio.bikeLabel}）` : '') : '';
   const intro = workoutText
     ? `あなたは経験豊富なパーソナルトレーナーです。以下の「今日のトレーニング内容」をもとに、評価と次回のトレーニングメニューを提案してください。
 
@@ -2567,6 +3069,7 @@ function shiftMonth(ym, delta){
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
 }
 
+autoImportHamrehabBike();
 loadDraft();
 render({ skipCapture: true });
 </script>

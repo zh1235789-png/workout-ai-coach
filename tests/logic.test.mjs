@@ -270,7 +270,7 @@ test('weeklyVolume() は補助部位を0.5セットとして数える', () => {
     { name:'ベンチプレス', sets:[{warmup:true},{},{},{},{}] },
     { name:'アームカール', sets:[{},{},{}] },
   ]}];
-  const a = loadApp({ storage:{ wac_sessions: JSON.stringify(sessions) } });
+  const a = loadApp({ today:'2026-09-21T09:00:00+09:00', storage:{ wac_sessions: JSON.stringify(sessions) } });
   const v = norm(a.weeklyVolume(0).byPart);
   assert.equal(v['胸'], 4);        // 本番4セット（ウォームアップは除外）
   assert.equal(v['三頭筋'], 2);    // 4 × 0.5
@@ -372,7 +372,7 @@ test('weeklyVolume() は有酸素マシンをセット数に加えない', () =>
     { name:'ローイングマシン', sets:[{},{},{}] },
     { name:'シーテッドロウ', sets:[{},{},{}] },
   ]}];
-  const v = norm(loadApp({ storage:{ wac_sessions: JSON.stringify(sessions) } }).weeklyVolume(0).byPart);
+  const v = norm(loadApp({ today:'2026-09-21T09:00:00+09:00', storage:{ wac_sessions: JSON.stringify(sessions) } }).weeklyVolume(0).byPart);
   assert.equal(v['広背筋'], 3);
   assert.equal(v['僧帽筋'], 1.5);   // シーテッドロウの分だけ
   assert.equal(v['二頭筋'], 1.5);
