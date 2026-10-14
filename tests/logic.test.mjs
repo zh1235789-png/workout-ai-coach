@@ -472,3 +472,9 @@ test('buildPrompt() は脚だけの日を作らず、毎回1〜2種目入れる�
   assert.match(p, /"Delts\+"/);
   assert.doesNotMatch(p, /"Legs\+": /);   // 旧カテゴリは定義として残さない（履歴の読み替えだけ）
 });
+
+test('buildPrompt() は脚のタイプをA/B/Cで回し、拮抗筋スーパーセットとハムの痛みの条件を含む', () => {
+  const p = app().buildPrompt('1', 'none', null, 0);
+  assert.match(p, /レッグエクステンション＋レッグカールの拮抗筋スーパーセット/);
+  assert.match(p, /痛み0が続いている場合のみ/);
+});
