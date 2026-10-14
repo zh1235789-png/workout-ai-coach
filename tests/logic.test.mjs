@@ -489,3 +489,12 @@ test('脚の目標は10〜12。旧初期値(12〜20)で保存済みなら起動�
   const back = loadApp({ storage:{ wac_vol_targets: JSON.stringify({ 脚:[12,20] }), wac_leg_target_2026_10:'1' } });
   assert.deepEqual(norm(back.getVolumeTargets()['脚']), [12,20]);
 });
+
+test('buildPrompt() はmustを上半身4種目、optionalを脚1〜2＋上半身1〜2にする', () => {
+  const p = app().buildPrompt('1', 'none', null, 0);
+  assert.match(p, /must_exercises: 上半身の「絶対にやるべき種目」を必ず4種目。脚種目は入れない/);
+  assert.match(p, /optional_exercises: 脚の提案1〜2種目＋上半身の提案1〜2種目/);
+  assert.doesNotMatch(p, /合計8種目ちょうど/);
+  assert.doesNotMatch(p, /2種目ともmust_exercises/);   // 旧ルールとの食い違いを残さない
+  assert.doesNotMatch(p, /段階的に再開する提案/);
+});
