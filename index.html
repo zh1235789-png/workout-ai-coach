@@ -738,9 +738,10 @@ function secondaryPartsOf(name){
 
 // 週あたりの目標セット数（下限・上限）。編集可。
 // 12〜20セット/週が目安（Baz-Valle 2022）。間接セットを0.5として数えたうえでの値。
+// 脚だけは10〜12（2026-10-14 ユーザー指定。脚トレを3回に3〜4セットずつ分散する前提）。
 const DEFAULT_VOLUME_TARGETS = {
   胸:[12,20], 広背筋:[12,20], 僧帽筋:[10,20], 肩:[12,20],
-  二頭筋:[10,20], 三頭筋:[12,22], 脚:[12,20], 体幹:[6,12],
+  二頭筋:[10,20], 三頭筋:[12,22], 脚:[10,12], 体幹:[6,12],
 };
 function getVolumeTargets(){
   let saved = {};
@@ -751,6 +752,20 @@ function getVolumeTargets(){
     out[p] = (Array.isArray(v) && v.length===2 && v.every(n=>typeof n==='number' && n>=0)) ? v : d;
   });
   return out;
+}
+// 設定タブで一度でも保存していると旧初期値（脚12〜20）が残るので、旧初期値のままなら1回だけ新しい値に置き換える。
+// 自分で変えた値は触らない。
+const LS_KEY_LEG_TARGET_MIGRATED = 'wac_leg_target_2026_10';
+function migrateLegTarget(){
+  try{
+    if(localStorage.getItem(LS_KEY_LEG_TARGET_MIGRATED)) return;
+    const saved = JSON.parse(localStorage.getItem(LS_KEY_VOL_TARGETS) || 'null');
+    if(saved && Array.isArray(saved['脚']) && saved['脚'][0]===12 && saved['脚'][1]===20){
+      saved['脚'] = DEFAULT_VOLUME_TARGETS['脚'].slice();
+      saveVolumeTargets(saved);
+    }
+    localStorage.setItem(LS_KEY_LEG_TARGET_MIGRATED, '1');
+  }catch(e){}
 }
 function saveVolumeTargets(t){ localStorage.setItem(LS_KEY_VOL_TARGETS, JSON.stringify(t)); }
 // targets を渡せば localStorage の読み直しを避けられる（一覧描画用）
@@ -3068,6 +3083,7 @@ function shiftMonth(ym, delta){
 }
 
 autoImportHamrehabBike();
+migrateLegTarget();
 loadDraft();
 render({ skipCapture: true });
 </script>

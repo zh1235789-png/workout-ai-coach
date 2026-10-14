@@ -282,13 +282,13 @@ test('getVolumeTargets() は初期値を返し、保存値で上書きできる'
   assert.deepEqual(norm(app().getVolumeTargets()['胸']), [12,20]);
   const a = loadApp({ storage:{ wac_vol_targets: JSON.stringify({ 胸:[8,14] }) } });
   assert.deepEqual(norm(a.getVolumeTargets()['胸']), [8,14]);
-  assert.deepEqual(norm(a.getVolumeTargets()['脚']), [12,20]);   // 未設定の部位は初期値
+  assert.deepEqual(norm(a.getVolumeTargets()['脚']), [10,12]);   // 未設定の部位は初期値
 });
 
 test('getVolumeTargets() は壊れた保存値を無視する', () => {
   const a = loadApp({ storage:{ wac_vol_targets: '{"胸":"ダメ","脚":[5]}' } });
   assert.deepEqual(norm(a.getVolumeTargets()['胸']), [12,20]);
-  assert.deepEqual(norm(a.getVolumeTargets()['脚']), [12,20]);
+  assert.deepEqual(norm(a.getVolumeTargets()['脚']), [10,12]);
 });
 
 test('volumeClass() は目標の下限・上限で色を変える', () => {
@@ -477,4 +477,15 @@ test('buildPrompt() は脚のタイプをA/B/Cで回し、拮抗筋スーパー�
   const p = app().buildPrompt('1', 'none', null, 0);
   assert.match(p, /レッグエクステンション＋レッグカールの拮抗筋スーパーセット/);
   assert.match(p, /痛み0が続いている場合のみ/);
+});
+
+test('脚の目標は10〜12。旧初期値(12〜20)で保存済みなら起動時に1回だけ置き換え、自分で変えた値は残す', () => {
+  const old = loadApp({ storage:{ wac_vol_targets: JSON.stringify({ 胸:[12,20], 脚:[12,20] }) } });
+  assert.deepEqual(norm(old.getVolumeTargets()['脚']), [10,12]);
+  assert.deepEqual(norm(old.getVolumeTargets()['胸']), [12,20]);
+  const mine = loadApp({ storage:{ wac_vol_targets: JSON.stringify({ 脚:[8,14] }) } });
+  assert.deepEqual(norm(mine.getVolumeTargets()['脚']), [8,14]);
+  // 移行済みなら、あとで自分で12〜20に戻した値も触らない
+  const back = loadApp({ storage:{ wac_vol_targets: JSON.stringify({ 脚:[12,20] }), wac_leg_target_2026_10:'1' } });
+  assert.deepEqual(norm(back.getVolumeTargets()['脚']), [12,20]);
 });
