@@ -463,3 +463,12 @@ test('renderTrends() と weeklyVolumeText() も例外なく動く（両モード
     assert.equal(typeof a.weeklyVolumeText(), 'string');
   }
 });
+
+// ===== 脚トレは3回に分散（2026-10-14） =====
+
+test('buildPrompt() は脚だけの日を作らず、毎回1〜2種目入れるよう指示する', () => {
+  const p = app().buildPrompt('1', 'none', null, 0);
+  assert.match(p, /どのカテゴリの回にも脚種目を1〜2種目/);
+  assert.match(p, /"Delts\+"/);
+  assert.doesNotMatch(p, /"Legs\+": /);   // 旧カテゴリは定義として残さない（履歴の読み替えだけ）
+});
