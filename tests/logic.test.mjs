@@ -577,3 +577,11 @@ test('軸種目の部位分類: 肘を開くロウは僧帽筋が主働、ロー
   const all = Object.values(a.$('ANCHOR_MENUS')).flatMap(g => Object.values(g).flatMap(x => x.must));
   for (const n of all) assert.notEqual(a.bodyPartOf(n), 'その他', n);
 });
+
+test('buildPrompt() の脚タイプAはレッグプレスかハックスクワット、Cはブルガリアンかダンベルルーマニアンで、スクワットとヒップスラストは提案しない', () => {
+  const p = app().buildPrompt('2', 'none', null, 0);
+  assert.match(p, /- A: レッグプレス、またはハックスクワット（志村はどちらか、本郷はレッグプレス）/);
+  assert.match(p, /バーベル・スミス・フロントのスクワットは提案しない/);
+  assert.doesNotMatch(p, /A: スクワット系/);
+  assert.match(p, /- C: ブルガリアンスクワット、またはダンベルのルーマニアンデッドリフト（ストラップ使用）。ヒップスラストは提案しない/);
+});
