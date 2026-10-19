@@ -492,7 +492,7 @@ test('脚の目標は10〜12。旧初期値(12〜20)で保存済みなら起動�
 
 test('buildPrompt() はmustを上半身4種目、optionalを脚1〜2＋上半身1〜2にする', () => {
   const p = app().buildPrompt('1', 'none', null, 0);
-  assert.match(p, /must_exercises: 上半身の「絶対にやるべき種目」を必ず4種目。脚種目は入れない/);
+  assert.match(p, /must_exercises: 【このジムの軸種目】の「必須」4種目（上半身のみ。脚種目は入れない）/);
   assert.match(p, /optional_exercises: 脚の提案1〜2種目＋上半身の提案1〜2種目/);
   assert.doesNotMatch(p, /合計8種目ちょうど/);
   assert.doesNotMatch(p, /2種目ともmust_exercises/);   // 旧ルールとの食い違いを残さない
@@ -535,4 +535,45 @@ test('exerciseHistorySummaryText() は全期間から種目ごとに前回・最
   assert.match(t, /懸垂: 前回 08\/01 自重×6 ／ 最高 自重×6（08\/01） ／ 計1回/);
   assert.ok(t.indexOf('ラットプルダウン') < t.indexOf('懸垂'));   // 前回が新しい順
   assert.equal(loadApp().exerciseHistorySummaryText(), '');
+});
+
+// ===== 店舗別の軸種目（2026-10-19） =====
+
+test('buildPrompt() は選んだジムの軸種目だけを渡し、志村ではケーブル不可を明記する', () => {
+  const shimura = app().buildPrompt('1', 'none', null, 0);
+  assert.match(shimura, /■Push\n  必須（この順で固定）: 1\. マシンチェストプレス \/ 2\. マシンインクラインプレス/);
+  assert.match(shimura, /フロントプル/);
+  assert.match(shimura, /ケーブルマシンは使えません/);
+  assert.doesNotMatch(shimura, /チンニング（縦グリップ）/);
+  const hongo = app().buildPrompt('2', 'none', null, 0);
+  assert.match(hongo, /1\. ダンベルプレス \/ 2\. インクラインダンベルプレス/);
+  assert.match(hongo, /1\. チンニング（縦グリップ）/);
+  assert.doesNotMatch(hongo, /ケーブルマシンは使えません/);
+  for (const p of [shimura, hongo]) {
+    assert.match(p, /バーベルのベンチプレス・バーベルロウ・デッドリフト/);
+    assert.match(p, /"Delts\+": 肩（中部2種目・前部1種目・後部1種目）/);
+    assert.match(p, /must_exercises: 【このジムの軸種目】の「必須」4種目/);
+  }
+});
+
+test('ANCHOR_MENUS は両店舗・3カテゴリとも必須がちょうど4種目で、志村にケーブル種目がない', () => {
+  const m = app().$('ANCHOR_MENUS');
+  for (const g of ['1', '2']) for (const c of ['Push', 'Pull', 'Delts+']) assert.equal(m[g][c].must.length, 4, `${g} ${c}`);
+  const shimuraNames = Object.values(m['1']).flatMap(x => [...x.must, ...x.optional]);
+  assert.ok(shimuraNames.every(n => !/ケーブル|ロープ/.test(n)), shimuraNames.join(','));
+});
+
+test('軸種目の部位分類: 肘を開くロウは僧帽筋が主働、ロープ種目は広背筋にしない、ダンベルプレスは胸', () => {
+  const a = app();
+  assert.equal(a.bodyPartOf('Tバーロウ（ワイド・肘を開く）'), '僧帽筋');
+  assert.deepEqual(norm(a.secondaryPartsOf('ケーブルロウ（ワイド・肘を開く）')).sort(), ['二頭筋', '広背筋', '肩'].sort());
+  assert.equal(a.bodyPartOf('DPLシーテッドロー（縦グリップ・肘を体に沿わせる）'), '広背筋');
+  assert.equal(a.bodyPartOf('フロントプル'), '広背筋');
+  assert.deepEqual(norm(a.secondaryPartsOf('フロントプル')), ['二頭筋']);
+  assert.equal(a.bodyPartOf('ロープオーバーヘッドエクステンション'), '三頭筋');
+  assert.equal(a.bodyPartOf('ダンベルプレス'), '胸');
+  assert.equal(a.bodyPartOf('ダンベルショルダープレス'), '肩');
+  // 全軸種目が「その他」に落ちない
+  const all = Object.values(a.$('ANCHOR_MENUS')).flatMap(g => Object.values(g).flatMap(x => x.must));
+  for (const n of all) assert.notEqual(a.bodyPartOf(n), 'その他', n);
 });
