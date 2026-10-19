@@ -585,3 +585,28 @@ test('buildPrompt() の脚タイプAはレッグプレスかハックスクワ�
   assert.doesNotMatch(p, /A: スクワット系/);
   assert.match(p, /- C: ブルガリアンスクワット、またはダンベルのルーマニアンデッドリフト（ストラップ使用）。ヒップスラストは提案しない/);
 });
+
+// ===== 新しい刺激枠（2026-10-19） =====
+
+test('buildPrompt() は新しい刺激枠を1種目求め、直近の提案を渡して重複を避けさせる', () => {
+  const sessions = [
+    { id:'a', date:'2026-09-10', exercises:[], next_menu:{ category:'Push', bonus_exercise:{ name:'ケーブルクロスオーバー', reason:'x' } } },
+    { id:'b', date:'2026-09-14', exercises:[], next_menu:{ category:'Pull', bonus_exercise:{ name:'ワンハンドロウ', reason:'y' } } },
+  ];
+  const a = loadApp({ today:'2026-09-21T09:00:00+09:00', storage:{ wac_sessions: JSON.stringify(sessions) } });
+  const p = a.buildPrompt('1', 'none', null, 0);
+  assert.match(p, /直近に提案した新しい刺激: ケーブルクロスオーバー、ワンハンドロウ/);
+  assert.match(p, /"bonus_exercise": \{"name":/);
+  assert.match(p, /- bonus_exercise: 新しい刺激枠を1種目/);
+  assert.match(app().buildPrompt('2', 'none', null, 0), /直近に提案した新しい刺激: なし/);
+});
+
+test('renderNextMenu() は新しい刺激枠を理由つきで表示し、無ければ出さない', () => {
+  const a = app();
+  const nm = { category:'Push', must_exercises:[], optional_exercises:[], bonus_exercise:{ name:'ダンベルプルオーバー', target:'2セット×12回 10kg', rest:'60秒', reason:'胸と広背筋を伸びた位置で鍛えられる' } };
+  const html = a.renderNextMenu(nm);
+  assert.match(html, /新しい刺激（さらに余裕があれば）/);
+  assert.match(html, /ダンベルプルオーバー/);
+  assert.match(html, /💡 胸と広背筋を伸びた位置で鍛えられる/);
+  assert.doesNotMatch(a.renderNextMenu({ must_exercises:[], optional_exercises:[] }), /新しい刺激/);
+});

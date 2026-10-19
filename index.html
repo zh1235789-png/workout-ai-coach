@@ -635,6 +635,11 @@ function renderNextMenu(nm, title){
       html += `<div class="menu-ex"><div class="n">${escapeHtml(ex.name)}</div><div class="t">${escapeHtml(ex.target||'')}${ex.rest?` ／ レスト ${escapeHtml(ex.rest)}`:''}</div>${ex.warmup&&(ex.warmup.weight!=null||ex.warmup.reps!=null)?`<div class="menu-warm">アップ: ${escapeHtml(formatWarmupHint(ex.warmup))}</div>`:''}</div>`;
     });
   }
+  const bx = nm.bonus_exercise;
+  if(bx && bx.name){
+    html += `<div class="menu-group-label">🟢 新しい刺激（さらに余裕があれば）</div>`;
+    html += `<div class="menu-ex"><div class="n">${escapeHtml(bx.name)}</div><div class="t">${escapeHtml(bx.target||'')}${bx.rest?` ／ レスト ${escapeHtml(bx.rest)}`:''}</div>${bx.reason?`<div class="menu-warm">💡 ${escapeHtml(bx.reason)}</div>`:''}</div>`;
+  }
   if(nm.notes){ html += `<div class="menu-notes">⚠️ ${escapeHtml(nm.notes)}</div>`; }
   html += `</div>`;
   return html;
@@ -2961,6 +2966,14 @@ optional_exercisesの上半身は「余裕枠の上半身候補」から選び�
 `;
 }
 
+// 新しい刺激枠（next_menu.bonus_exercise）の直近の提案。同じ種目を続けて出さないために渡す
+function recentBonusNames(limit){
+  return getSessions().filter(s=>s.type!=='cardio' && s.date && s.next_menu && s.next_menu.bonus_exercise && s.next_menu.bonus_exercise.name)
+    .sort((a,b)=>a.date.localeCompare(b.date))
+    .slice(-(limit||6))
+    .map(s=>s.next_menu.bonus_exercise.name);
+}
+
 // 全期間の種目別要約（前回・最高・推定1RMの推移・回数）。直近5回より前の種目もプロンプトに残す
 function exerciseHistorySummaryText(){
   const byName = {};
@@ -3097,12 +3110,23 @@ ${gymEquip}
     "optional_exercises": [
       {"name": "種目名（必ず上記設備リストにあるもののみ）", "target": "目安", "rest": "レスト時間", "warmup": {"weight": 数値またはnull, "reps": 数値またはnull}}
     ],
+    "bonus_exercise": {"name": "新しい刺激の種目名（設備リストにあるもののみ）", "target": "1〜2セット×回数と重量の目安", "rest": "レスト時間", "reason": "今回この種目を勧める理由（1〜2文）"},
     "notes": "怪我への配慮、漸進性、フォームなどに関する補足を1〜2文で。"
   }
 }
+【新しい刺激枠（bonus_exercise）】
+余裕枠のさらに余裕があるとき用に、毎回1種目だけ「新しい刺激」になる種目を提案してください。
+- 今回のmust_exercises・optional_exercisesにも、上の【このジムの軸種目】の一覧にもない種目にする
+- このジムの設備でできて、手首・ケーブル・脚の制約（上に書いたもの）と今日のハムの痛み・ランニングの条件を守る
+- 直近に提案した新しい刺激: ${recentBonusNames().join('、') || 'なし'}。これらとは別の種目にする
+- 選び方の優先: 週のセット数が目標を下回っている部位 → 今回のカテゴリの部位を軸種目と違う角度で（片側ずつ・筋肉が伸びた位置で負荷がかかる・別の動作面など）
+- 1〜2セット、軽めの重量から。targetに重量の目安を書く（初めての種目なので控えめに）
+- reasonには「なぜ今回この種目か」を1〜2文で書く（どの部位のどんな不足・どんな刺激を補うか）。論文名や数値を挙げるのは確かなものだけにする
+
 【種目数】
 - must_exercises: 【このジムの軸種目】の「必須」4種目（上半身のみ。脚種目は入れない）。
 - optional_exercises: 脚の提案1〜2種目＋上半身の提案1〜2種目（合計2〜4種目）。脚種目を先に並べる。
+- bonus_exercise: 新しい刺激枠を1種目（上の【新しい刺激枠】を参照）。
 これ以上の種目数は提案しないでください。全種目に必ずrest（レスト時間）を明記してください。
 
 【ウォームアップについて】
