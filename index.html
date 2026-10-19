@@ -2903,6 +2903,46 @@ function validateResult(obj){
   return obj;
 }
 
+// 全期間の種目別要約（前回・最高・推定1RMの推移・回数）。直近5回より前の種目もプロンプトに残す
+function exerciseHistorySummaryText(){
+  const byName = {};
+  getSessions().filter(s=>s.type!=='cardio' && s.date)
+    .sort((a,b)=>a.date.localeCompare(b.date))
+    .forEach(s=>{
+      (s.exercises||[]).forEach(e=>{
+        const name = (e.name||'').trim();
+        const work = (e.sets||[]).filter(x=>!x.warmup && x.reps!=null);
+        if(!name || work.length === 0) return;
+        (byName[name] = byName[name] || []).push({ date: s.date, work });
+      });
+    });
+  const md = d => d.slice(5).replace('-','/');
+  const lines = Object.keys(byName).map(name=>{
+    const list = byName[name];
+    const last = list[list.length-1];
+    const lastStr = last.work.map(x=>`${x.weight==null?'自重':x.weight+'kg'}×${x.reps}`).join(', ');
+    // 最高: 重量が最大のセット（同重量なら回数が多い方）。自重種目は回数の最大
+    let best = null;
+    list.forEach(l=>l.work.forEach(x=>{
+      const w = x.weight==null ? -1 : x.weight;
+      if(!best || w > best.w || (w === best.w && x.reps > best.reps)) best = { w, reps: x.reps, date: l.date };
+    }));
+    const bestStr = `${best.w<0?'自重':best.w+'kg'}×${best.reps}（${md(best.date)}）`;
+    const rm = exercise1RMSeries(name);
+    let rmStr = '';
+    if(rm.length){
+      const first = rm[0], latest = rm[rm.length-1];
+      const peak = rm.reduce((a,b)=>b.value > a.value ? b : a);
+      rmStr = rm.length === 1 ? ` ／ 推定1RM ${latest.value}kg`
+        : ` ／ 推定1RM ${first.value}→${latest.value}kg（${md(first.date)}→${md(latest.date)}）${peak.value > latest.value ? ` 最高${peak.value}kg（${md(peak.date)}）` : ''}`;
+    }
+    return { date: last.date, text: `${name}: 前回 ${md(last.date)} ${lastStr} ／ 最高 ${bestStr}${rmStr} ／ 計${list.length}回` };
+  });
+  if(lines.length === 0) return '';
+  lines.sort((a,b)=>b.date.localeCompare(a.date));
+  return `\n【全期間の種目別まとめ（前回が新しい順）】\n${lines.map(l=>l.text).join('\n')}\n直近の履歴にない種目を提案するときは、このまとめの前回・最高の重量を基準にしてください。推定1RMが何回も伸びていない種目は停滞とみなし、評価コメントで触れたうえで回数・セット数・種目の変更などを提案してください。\n`;
+}
+
 function buildPrompt(gymId, cardio, workoutText, pain){
   // 筋トレは直近5回（有酸素だけの日で枠を食わないよう分ける）、有酸素は直近7日分を別に渡す
   const sorted = getSessions().slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
@@ -2961,7 +3001,7 @@ ${weeklyVolumeText()}
 - C: ブルガリアンスクワット、またはヒップヒンジ系（ルーマニアンデッドリフト・ヒップスラスト等）
 脚トレは再開済みです。ハムストリングスに伸張負荷がかかる種目（レッグカール・ルーマニアンデッドリフト等のヒップヒンジ）も通常どおり入れてよいですが、重量は履歴を見て漸進的に上げてください。今日の痛みが1以上のときはB・Cをレッグエクステンションや臀部の種目に置き換えてください。
 
-【直近の筋トレ履歴（最大5回。各種目は本番セットの「重量×回数」を時系列で記載）】
+${exerciseHistorySummaryText()}【直近の筋トレ履歴（最大5回。各種目は本番セットの「重量×回数」を時系列で記載）】
 ${historyText}
 
 【直近7日の有酸素運動】

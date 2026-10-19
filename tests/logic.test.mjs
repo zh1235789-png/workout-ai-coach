@@ -518,3 +518,21 @@ test('buildPrompt() は筋トレを直近5回、有酸素を直近7日として�
   assert.match(cardio, /2026-09-15/);
   assert.doesNotMatch(cardio, /2026-09-14/);          // 7日より前は入れない
 });
+
+test('exerciseHistorySummaryText() は全期間から種目ごとに前回・最高・推定1RM推移・回数をまとめる', () => {
+  const sessions = [
+    { id:'a', date:'2026-08-01', exercises:[{ name:'ラットプルダウン', sets:[{ weight:20, reps:15, warmup:true }, { weight:45, reps:10 }] }, { name:'懸垂', sets:[{ weight:null, reps:6 }] }] },
+    { id:'b', date:'2026-09-01', exercises:[{ name:'ラットプルダウン', sets:[{ weight:52.5, reps:8 }] }] },
+    { id:'c', date:'2026-10-17', exercises:[{ name:'ラットプルダウン', sets:[{ weight:50, reps:10 }, { weight:50, reps:9 }] }] },
+    { id:'d', type:'cardio', date:'2026-10-18', cardio:'run' },
+  ];
+  const t = loadApp({ storage:{ wac_sessions: JSON.stringify(sessions) } }).exerciseHistorySummaryText();
+  const lat = t.split('\n').find(l=>l.startsWith('ラットプルダウン'));
+  assert.match(lat, /前回 10\/17 50kg×10, 50kg×9/);
+  assert.match(lat, /最高 52.5kg×8（09\/01）/);          // アップの20kgは数えない
+  assert.match(lat, /推定1RM 60→66.7kg（08\/01→10\/17）/);
+  assert.match(lat, /計3回/);
+  assert.match(t, /懸垂: 前回 08\/01 自重×6 ／ 最高 自重×6（08\/01） ／ 計1回/);
+  assert.ok(t.indexOf('ラットプルダウン') < t.indexOf('懸垂'));   // 前回が新しい順
+  assert.equal(loadApp().exerciseHistorySummaryText(), '');
+});
