@@ -610,3 +610,28 @@ test('renderNextMenu() は新しい刺激枠を理由つきで表示し、無け
   assert.match(html, /💡 胸と広背筋を伸びた位置で鍛えられる/);
   assert.doesNotMatch(a.renderNextMenu({ must_exercises:[], optional_exercises:[] }), /新しい刺激/);
 });
+
+// ===== 週の予定で脚のタイプを決める（2026-10-20） =====
+
+test('nextGymSlot() は月・木を飛ばし、土日を1枠として次の筋トレ日を返す', () => {
+  const a = app();
+  assert.equal(a.nextGymSlot('2026-10-20').label, '水');          // 火 → 水
+  assert.equal(a.nextGymSlot('2026-10-21').label, '金');          // 水 → (木オフ) → 金
+  assert.equal(a.nextGymSlot('2026-10-23').label, '土日のどちらか'); // 金 → 週末
+  assert.equal(a.nextGymSlot('2026-10-24').label, '火');          // 土 → (日は同じ枠) → 火
+  assert.equal(a.nextGymSlot('2026-10-25').label, '火');          // 日 → (月オフ) → 火
+  assert.equal(a.nextGymSlot('2026-10-19').label, '火');          // 月(オフ) → 火
+});
+
+test('buildPrompt() は曜日で脚タイプを指定し、ロング走の日だけ脚を外す', () => {
+  const tue = loadApp({ today:'2026-10-20T20:00:00+09:00' }).buildPrompt('1', 'run', null, 0);
+  assert.match(tue, /【週の予定と脚のタイプ】/);
+  assert.match(tue, /次回の筋トレは「水」の予定です。次回メニューの脚は入れないでください/);
+  assert.match(tue, /脚種目を外すのはロング走の日（水曜）だけ/);
+  assert.doesNotMatch(tue, /ランニングをする日は脚種目を飛ばしてください/);
+  assert.doesNotMatch(tue, /前回と違うタイプを順番に回して/);
+  const fri = loadApp({ today:'2026-10-23T20:00:00+09:00' }).buildPrompt('1', 'run', null, 0);
+  assert.match(fri, /次回の筋トレは「土日のどちらか」の予定です。次回メニューの脚はタイプCにしてください/);
+  const sun = loadApp({ today:'2026-10-25T20:00:00+09:00' }).buildPrompt('2', 'none', null, 0);
+  assert.match(sun, /次回の筋トレは「火」の予定です。次回メニューの脚はタイプBにしてください。翌日がロング走なのでBは軽め/);
+});

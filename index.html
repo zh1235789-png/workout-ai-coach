@@ -274,7 +274,7 @@ const LS_KEY_VOL_TARGETS = 'wac_vol_targets';
 const LS_KEY_VOL_RANGE = 'wac_vol_range';
 const LS_KEY_BIKE_UNIT = 'wac_bike_unit';
 const BACKUP_KEYS = [LS_KEY_SESSIONS, LS_KEY_CONDITION, LS_KEY_GYM_EQUIP_1, LS_KEY_GYM_EQUIP_2, LS_KEY_LAST_GYM, LS_KEY_CUSTOM_EX, LS_KEY_BODY, LS_KEY_VOL_TARGETS, LS_KEY_VOL_RANGE, LS_KEY_BIKE_UNIT];
-const DEFAULT_CONDITION = '左ハムストリング肉離れ(2026-07-04受傷)から回復し、脚トレは再開済み。痛みが出ない範囲で漸進的に。目的は健康維持・筋力向上・体脂肪率の低下。筋トレ週3-4回、有酸素運動(ランニング・ウォーキング)週3-4回。';
+const DEFAULT_CONDITION = '左ハムストリング肉離れ(2026-07-04受傷)から回復し、脚トレは再開済み。痛みが出ない範囲で漸進的に。目的は健康維持・筋力向上・体脂肪率の低下。筋トレ週4回(火・水・金・土日どちらか)、ランニング週3回(Garminコーチ10K、火・水ロング走・金)、バイク4×4週1回(土)。月・木は手術日でオフ。';
 
 const GYM_NAMES = { '1': 'エニタイムフィットネス志村坂上店', '2': 'エニタイムフィットネス文京本郷店（本郷三丁目）' };
 const CARDIO_LABELS = { 'none': 'なし', 'walk': 'ウォーキング', 'run': 'ランニング', 'bike': 'バイク4×4' };
@@ -2966,6 +2966,38 @@ optional_exercisesの上半身は「余裕枠の上半身候補」から選び�
 `;
 }
 
+// 週の予定（2026-10-20 ユーザー指定）。月・木は手術日でオフ。ランはGarminコーチ10K（Jeff）で火・水(ロング走)・金、
+// 筋トレは火・水・金＋土日のどちらか（既定は日。土は仕事のあとにバイク4×4）。
+// 脚のタイプは曜日で決める: 火=B軽め（翌日ロング走）、水=なし（ロング走の日）、金=A、週末=C（翌日がオフで、ロング走まで中2日）。
+const WEEK_PLAN = [
+  { days:[2], label:'火', run:'イージーラン（朝）', leg:'B', note:'翌日がロング走なのでBは軽め（RPE7〜8、レッグカールは限界まで追い込まない）' },
+  { days:[3], label:'水', run:'ロング走（朝）', leg:null, note:'ロング走の日なので脚種目は入れない（上半身だけ）' },
+  { days:[5], label:'金', run:'イージーラン（朝）', leg:'A', note:'' },
+  { days:[6,0], label:'土日のどちらか', run:'なし（土曜はバイク4×4）', leg:'C', note:'ハムに一番負荷のかかるCは、あとに回復日がある週末に置く' },
+];
+// 今日の次の筋トレ枠。土日は1枠として扱う（土にやっても日にやっても次は火）
+function nextGymSlot(dateStr){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const base = new Date(y, m-1, d);
+  const todaySlot = WEEK_PLAN.find(p=>p.days.includes(base.getDay()));
+  for(let i=1;i<=7;i++){
+    const wd = new Date(y, m-1, d+i).getDay();
+    const slot = WEEK_PLAN.find(p=>p.days.includes(wd));
+    if(slot && slot!==todaySlot) return slot;
+  }
+  return WEEK_PLAN[0];
+}
+function weekPlanText(dateStr){
+  const next = nextGymSlot(dateStr);
+  const rows = WEEK_PLAN.map(p=>`- ${p.label}: ラン=${p.run} / 脚=${p.leg ? p.leg : 'なし'}${p.note ? '　※'+p.note : ''}`).join('\n');
+  return `【週の予定と脚のタイプ】
+月・木は仕事（手術日）で完全オフ。筋トレの日ごとに、脚のタイプは次のとおり曜日で固定です。
+${rows}
+次回の筋トレは「${next.label}」の予定です。次回メニューの脚は${next.leg ? 'タイプ'+next.leg+'にしてください' : '入れないでください（optional_exercisesは上半身の1〜2種目だけ）'}。${next.note ? next.note+'。' : ''}
+notesの冒頭に「次回=${next.label}・脚${next.leg||'なし'}」と書き、予定と違う曜日に行く場合は上の表の脚タイプに差し替えるよう一言添えてください。
+`;
+}
+
 // 新しい刺激枠（next_menu.bonus_exercise）の直近の提案。同じ種目を続けて出さないために渡す
 function recentBonusNames(limit){
   return getSessions().filter(s=>s.type!=='cardio' && s.date && s.next_menu && s.next_menu.bonus_exercise && s.next_menu.bonus_exercise.name)
@@ -3065,9 +3097,10 @@ ${weeklyVolumeText()}
 直近のセッション履歴にある「前回提案カテゴリ」を参照し、同じカテゴリが連続しないよう、バランスよくローテーションしてください（履歴にある旧カテゴリ"Legs+"は"Delts+"と同じ扱いです）。
 
 ${anchorMenuText(gymId)}
+${weekPlanText(todayStr())}
 【脚トレは3回に分散】
-脚だけの日は作らず、どのカテゴリの回にも脚種目を1〜2種目入れてください。脚種目はmust_exercisesには入れず、すべてoptional_exercisesに入れます（下の【種目数】を参照）。1回あたりの脚は合計2種目・3〜4セットまでにし、週の脚のセット数を3回に分ける（例: 3／4／3セット）つもりで組んでください。毎回フレッシュな状態で脚をやることで、1日にまとめるより1セットごとの質とボリュームを保てます。
-3回のローテーションでは、直近の履歴を見て前回と違うタイプを順番に回してください。
+脚だけの日は作らず、水曜（ロング走の日）以外はどのカテゴリの回にも脚種目を1〜2種目入れてください。脚種目はmust_exercisesには入れず、すべてoptional_exercisesに入れます（下の【種目数】を参照）。1回あたりの脚は合計2種目・3〜4セットまでにし、週の脚のセット数を3回に分ける（例: 3／4／3セット）つもりで組んでください。毎回フレッシュな状態で脚をやることで、1日にまとめるより1セットごとの質とボリュームを保てます。
+どのタイプにするかは【週の予定と脚のタイプ】の曜日に従ってください（火=B・金=A・週末=C）。
 - A: レッグプレス、またはハックスクワット（志村はどちらか、本郷はレッグプレス）。バーベル・スミス・フロントのスクワットは提案しない
 - B: レッグエクステンション＋レッグカールの拮抗筋スーパーセット（交互に行い、ペアの間はレストなし。targetに「○○とスーパーセット」と明記し、restはペアを1周した後のレストにする。このペアは脚の2種目としてoptional_exercisesに入れ、それぞれ2セットずつを目安にする）
 - C: ブルガリアンスクワット、またはダンベルのルーマニアンデッドリフト（ストラップ使用）。ヒップスラストは提案しない
@@ -3085,7 +3118,7 @@ ${workoutText ? '' : '写真から読み取れるのは今日の分だけです�
 痛みが1以上の日は脚種目を提案せず（その回のoptional_exercisesは上半身の1〜2種目だけにする）、3以上なら評価コメントで運動強度を落とすよう明確に助言してください。痛みが0なら脚種目は通常どおり入れてください。
 
 【今日の有酸素運動】${cardioLabel}${cardioAmountLabel}
-ランニングをした日は脚トレを行わない方針です。今日ランニングをしている場合、今回のトレーニング内容に脚種目が含まれていれば評価コメントで軽く触れてください。また、次回メニューに脚種目を入れる場合は、notesに必ず「ランニングをする日は脚種目を飛ばしてください」という趣旨の注意を含めてください。
+脚種目を外すのはロング走の日（水曜）だけです。火・金のイージーラン（ラン・ウォーク）の日は、午後の筋トレで【週の予定と脚のタイプ】どおりに脚を入れてかまいません。今日ロング走をしていて、今回のトレーニング内容に脚種目が含まれていれば評価コメントで軽く触れてください。
 
 【次回トレーニングを行うジム】${gymName}
 【このジムの設備】
