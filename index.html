@@ -493,7 +493,16 @@ function renderHome(){
   if(state.pendingResult){
     return renderResult(state.pendingResult, true);
   }
-  let html = `<div class="card">
+  // 記録は筋トレMEMOで行い、このアプリは前回提案したメニューの表示だけにする
+  let menuHtml = '';
+  const lastStrength = getLastStrengthSession();
+  if(lastStrength && lastStrength.next_menu){
+    menuHtml = renderNextMenu(lastStrength.next_menu, `今日のメニュー（${escapeHtml(lastStrength.date||'')}の提案）`);
+  }else{
+    menuHtml = `<div class="card"><h2>🎯 今日のメニュー</h2><div class="sub">まだ提案がありません。筋トレ後に下の手順でClaudeに送ると、次回のメニューがここに表示されます。</div></div>`;
+  }
+
+  let html = menuHtml + `<div class="card">
     <h2>📍 次回行くジム</h2>
     <div class="seg">
       <button data-gym="1" class="gym-btn${state.selectedGym==='1'?' sel':''}">志村坂上店</button>
@@ -539,7 +548,7 @@ function renderHome(){
 
   html += `<div class="card">
     <h2>⏱ インターバルタイマー</h2>
-    <div class="sub" style="margin-bottom:10px">タップで開始。終了時に音とバイブでお知らせします。各セットの「⏱」からも開始できます。</div>
+    <div class="sub" style="margin-bottom:10px">タップで開始。終了時に音とバイブでお知らせします。</div>
     <div class="preset-grid">
       <button class="preset-btn" data-sec="30">30秒</button>
       <button class="preset-btn" data-sec="45">45秒</button>
@@ -552,53 +561,9 @@ function renderHome(){
     </div>
   </div>`;
 
-  if(state.entryRows===null || state.entryRows===undefined) state.entryRows = buildInitialEntryRows();
-  html += `<div class="card">
-    <h2>🏋️ 今日やった筋トレ</h2>
-    ${state.draftRestoredAt ? `<div class="draft-note">📝 ${escapeHtml(state.draftRestoredAt)} の入力途中の内容を復元しました</div>` : ''}
-    <div class="sub" style="margin-bottom:10px">${state.entryRowsFromMenu ? '前回提案したメニューを読み込みました。やった種目に重量・回数を入れてください（空欄の種目は「やらなかった」扱いになります）。' : '種目・重量・回数を入力してください。'}<br>左端のセット番号をタップすると「アップ」に切り替わります。</div>
-    <div id="entryRows">`;
-  state.entryRows.forEach((r,i)=>{
-    html += `<div class="entry-row" data-i="${i}" data-hint="${escapeAttr(r.hint||'')}" data-warmup-hint="${escapeAttr(r.warmupHint||'')}" data-rest-sec="${escapeAttr(r.restSec||'')}">
-      <div class="entry-head">
-        <input type="text" class="entry-name" data-i="${i}" placeholder="種目名" list="exList" value="${escapeAttr(r.name)}">
-        <button class="row-move row-up" data-i="${i}" title="上へ"${i===0?' disabled':''}>↑</button>
-        <button class="row-move row-down" data-i="${i}" title="下へ"${i===state.entryRows.length-1?' disabled':''}>↓</button>
-        <button class="entry-del" data-i="${i}" title="種目を削除">✕</button>
-      </div>`;
-    if(r.hint){ html += `<div class="entry-hint">目安: ${escapeHtml(r.hint)}</div>`; }
-    let workIdx = 0;
-    (r.sets||[]).forEach((s,j)=>{
-      const label = s.warmup ? 'アップ' : String(++workIdx);
-      html += `<div class="set-row" data-i="${i}" data-j="${j}" data-warmup="${s.warmup?'1':'0'}">
-        <button class="set-label warm-toggle${s.warmup?' warm':''}" data-i="${i}" data-j="${j}" title="ウォームアップ切替">${label}</button>
-        <input type="number" class="set-weight" placeholder="kg" inputmode="decimal" value="${escapeAttr(s.weight)}">
-        <span class="entry-x">×</span>
-        <input type="number" class="set-reps" placeholder="回" inputmode="numeric" value="${escapeAttr(s.reps)}">
-        <button class="set-timer" data-i="${i}" title="このセット後のインターバル開始">⏱</button>
-        <button class="set-del" data-i="${i}" data-j="${j}" title="セットを削除">−</button>
-      </div>`;
-      if(s.warmup && r.warmupHint){
-        html += `<div class="warm-hint">↑ 推奨: ${escapeHtml(r.warmupHint)}</div>`;
-      }
-    });
-    html += `<div class="rpe-row">
-        <span class="rpe-label">最終セットのRPE</span>
-        <select class="rpe-select" data-i="${i}">${rpeOptions(r.rpe)}</select>
-      </div>
-      <button class="set-add" data-i="${i}">＋ セット追加</button>
-    </div>`;
-  });
-  html += `</div>
-    <button class="btn btn-secondary" id="btnPickEx" style="margin-top:8px">📋 リストから種目を選ぶ</button>
-    <button class="btn btn-ghost" id="btnAddRow" style="margin-top:8px">＋ 空の種目を追加</button>
-    <button class="btn btn-secondary" id="btnResetRows" style="margin-top:8px">前回メニューを読み込み直す</button>
-    <button class="btn btn-ghost" id="btnClearDraft" style="margin-top:8px">入力をすべてクリア</button>
-  </div>`;
-
   html += `<div class="card">
     <h2><span class="step-num">1</span> プロンプトをコピー</h2>
-    <div class="sub" style="margin-bottom:12px">上で入力した内容がプロンプトに埋め込まれます。コピーしてClaudeのチャットに貼り付けて送ってください（写真は不要です。写真を使いたい場合は入力を空のままにして、写真と一緒に貼り付けてもOK）。</div>
+    <div class="sub" style="margin-bottom:12px">筋トレ後に、筋トレMEMOの<b>今日のサマリー画面のスクショ1枚</b>と一緒にClaudeのチャットへ貼り付けて送ってください。過去の記録はこのアプリが覚えているので、今日の1枚だけで足ります。</div>
     <button class="btn btn-primary" id="btnCopyPrompt">📋 プロンプトをコピー</button>
     <div id="copyDone" class="center-msg" style="display:none;color:var(--ok)">✓ コピーしました</div>
   </div>`;
@@ -641,27 +606,7 @@ function renderResult(result, isPending){
 
   html += `<div class="card"><h2>📝 評価</h2><div class="eval-box">${escapeHtml(result.evaluation||'')}</div></div>`;
 
-  if(result.next_menu){
-    const nm = result.next_menu;
-    html += `<div class="card"><h2>🎯 次回のトレーニングメニュー</h2>`;
-    if(nm.gym){ html += `<div class="sub" style="margin-bottom:6px">📍 ${escapeHtml(nm.gym)}</div>`; }
-    if(nm.category){ html += `<span class="ex-max" style="margin-left:0;margin-bottom:6px;display:inline-block">${escapeHtml(nm.category)}</span>`; }
-    html += `<div class="menu-focus">${escapeHtml(nm.focus||'')}</div>`;
-    if((nm.must_exercises||[]).length){
-      html += `<div class="menu-group-label">🔴 必須</div>`;
-      nm.must_exercises.forEach(ex=>{
-        html += `<div class="menu-ex"><div class="n">${escapeHtml(ex.name)}</div><div class="t">${escapeHtml(ex.target||'')}${ex.rest?` ／ レスト ${escapeHtml(ex.rest)}`:''}</div>${ex.warmup&&(ex.warmup.weight!=null||ex.warmup.reps!=null)?`<div class="menu-warm">アップ: ${escapeHtml(formatWarmupHint(ex.warmup))}</div>`:''}</div>`;
-      });
-    }
-    if((nm.optional_exercises||[]).length){
-      html += `<div class="menu-group-label">🟡 余裕があれば</div>`;
-      nm.optional_exercises.forEach(ex=>{
-        html += `<div class="menu-ex"><div class="n">${escapeHtml(ex.name)}</div><div class="t">${escapeHtml(ex.target||'')}${ex.rest?` ／ レスト ${escapeHtml(ex.rest)}`:''}</div>${ex.warmup&&(ex.warmup.weight!=null||ex.warmup.reps!=null)?`<div class="menu-warm">アップ: ${escapeHtml(formatWarmupHint(ex.warmup))}</div>`:''}</div>`;
-      });
-    }
-    if(nm.notes){ html += `<div class="menu-notes">⚠️ ${escapeHtml(nm.notes)}</div>`; }
-    html += `</div>`;
-  }
+  if(result.next_menu) html += renderNextMenu(result.next_menu);
 
   if(isPending){
     html += `<div class="card">`;
@@ -669,6 +614,29 @@ function renderResult(result, isPending){
     html += `<button class="btn btn-primary" id="btnSave">履歴に保存</button>
       <button class="btn btn-ghost" id="btnDiscard">破棄してやり直す</button></div>`;
   }
+  return html;
+}
+
+function renderNextMenu(nm, title){
+  let html = '';
+  html += `<div class="card"><h2>🎯 ${title||'次回のトレーニングメニュー'}</h2>`;
+  if(nm.gym){ html += `<div class="sub" style="margin-bottom:6px">📍 ${escapeHtml(nm.gym)}</div>`; }
+  if(nm.category){ html += `<span class="ex-max" style="margin-left:0;margin-bottom:6px;display:inline-block">${escapeHtml(nm.category)}</span>`; }
+  html += `<div class="menu-focus">${escapeHtml(nm.focus||'')}</div>`;
+  if((nm.must_exercises||[]).length){
+    html += `<div class="menu-group-label">🔴 必須</div>`;
+    nm.must_exercises.forEach(ex=>{
+      html += `<div class="menu-ex"><div class="n">${escapeHtml(ex.name)}</div><div class="t">${escapeHtml(ex.target||'')}${ex.rest?` ／ レスト ${escapeHtml(ex.rest)}`:''}</div>${ex.warmup&&(ex.warmup.weight!=null||ex.warmup.reps!=null)?`<div class="menu-warm">アップ: ${escapeHtml(formatWarmupHint(ex.warmup))}</div>`:''}</div>`;
+    });
+  }
+  if((nm.optional_exercises||[]).length){
+    html += `<div class="menu-group-label">🟡 余裕があれば</div>`;
+    nm.optional_exercises.forEach(ex=>{
+      html += `<div class="menu-ex"><div class="n">${escapeHtml(ex.name)}</div><div class="t">${escapeHtml(ex.target||'')}${ex.rest?` ／ レスト ${escapeHtml(ex.rest)}`:''}</div>${ex.warmup&&(ex.warmup.weight!=null||ex.warmup.reps!=null)?`<div class="menu-warm">アップ: ${escapeHtml(formatWarmupHint(ex.warmup))}</div>`:''}</div>`;
+    });
+  }
+  if(nm.notes){ html += `<div class="menu-notes">⚠️ ${escapeHtml(nm.notes)}</div>`; }
+  html += `</div>`;
   return html;
 }
 
@@ -2588,9 +2556,7 @@ function bindEvents(){
 
   const btnCopyPrompt = document.getElementById('btnCopyPrompt');
   if(btnCopyPrompt) btnCopyPrompt.onclick = async ()=>{
-    state.entryRows = collectEntryRows();
-    rememberExerciseNames(state.entryRows.map(r=>r.name));
-    const prompt = buildPrompt(state.selectedGym, state.cardio, entryRowsToText(state.entryRows), state.pain);
+    const prompt = buildPrompt(state.selectedGym, state.cardio, null, state.pain);
     await copyToClipboard(prompt);
     const msg = document.getElementById('copyDone');
     msg.style.display='block';
@@ -2938,13 +2904,14 @@ function validateResult(obj){
 }
 
 function buildPrompt(gymId, cardio, workoutText, pain){
-  const sessions = getSessions().slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).slice(-5);
+  // 筋トレは直近5回（有酸素だけの日で枠を食わないよう分ける）、有酸素は直近7日分を別に渡す
+  const sorted = getSessions().slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const sessions = sorted.filter(s=>s.type!=='cardio').slice(-5);
+  const cardioFrom = shiftDate(todayStr(), -6);
+  const recentCardio = sorted.filter(s=>s.type==='cardio' && s.date && s.date >= cardioFrom);
   let historyText = 'なし（初回の記録です）';
   if(sessions.length>0){
     historyText = sessions.map(s=>{
-      if(s.type==='cardio'){
-        return `${s.date}: 有酸素のみ ${CARDIO_LABELS[s.cardio]||s.cardio}${cardioDetailLabel(s)}、筋トレなし`;
-      }
       const detail = (s.exercises||[]).map(e=>{
         // 本番セットの「重量×回数」を並べる（アップは漸進性の判断に不要なので除く）
         const work = (e.sets||[]).filter(x=>!x.warmup)
@@ -2957,6 +2924,9 @@ function buildPrompt(gymId, cardio, workoutText, pain){
       return `${s.date} [${cat}] 有酸素=${cardioLabel}${cardioDetailLabel(s)}\n    ${detail}\n    評価メモ: ${(s.evaluation||'').slice(0,100)}`;
     }).join('\n');
   }
+  const cardioHistoryText = recentCardio.length
+    ? recentCardio.map(s=>`${s.date}: ${CARDIO_LABELS[s.cardio]||s.cardio}${cardioDetailLabel(s)}`).join('\n')
+    : 'なし';
   const gymName = GYM_NAMES[gymId];
   const gymEquip = getGymEquip(gymId);
   const cardioLabel = (cardioSummaryForDate(todayStr()) || {}).label || 'なし';
@@ -2991,9 +2961,12 @@ ${weeklyVolumeText()}
 - C: ブルガリアンスクワット、またはヒップヒンジ系（ルーマニアンデッドリフト・ヒップスラスト等）
 脚トレは再開済みです。ハムストリングスに伸張負荷がかかる種目（レッグカール・ルーマニアンデッドリフト等のヒップヒンジ）も通常どおり入れてよいですが、重量は履歴を見て漸進的に上げてください。今日の痛みが1以上のときはB・Cをレッグエクステンションや臀部の種目に置き換えてください。
 
-【直近のセッション履歴（各種目は本番セットの「重量×回数」を時系列で記載）】
+【直近の筋トレ履歴（最大5回。各種目は本番セットの「重量×回数」を時系列で記載）】
 ${historyText}
-今日のトレーニング内容にRPE（主観的追い込み度。10=限界であと0回、8=あと2回できた、7=あと3回）が記載されている種目は、それを最優先の判断材料にしてください。RPE 6〜7なら重量を上げ、8〜9なら現状維持、9.5〜10なら据え置きか回数調整、という方針で次回の重量を決めてください。
+
+【直近7日の有酸素運動】
+${cardioHistoryText}
+${workoutText ? '' : '写真から読み取れるのは今日の分だけです。過去の重量・回数は上の履歴を使ってください。\n'}今日のトレーニング内容にRPE（主観的追い込み度。10=限界であと0回、8=あと2回できた、7=あと3回）が記載されている種目は、それを最優先の判断材料にしてください。RPE 6〜7なら重量を上げ、8〜9なら現状維持、9.5〜10なら据え置きか回数調整、という方針で次回の重量を決めてください。
 上記の過去の重量・回数を必ず参照し、次回メニューのtargetには「前回○kgだったので今回は△kg」と具体的な重量を提示してください。同じ種目を過去にやっている場合は、その実績から漸進的に負荷を上げる（伸びていなければ据え置き・回数で調整する）判断をしてください。評価コメントでも、前回の同一種目と比較した増減に言及してください。
 
 【今日の左ハムの痛み】${painLabel}（0=なし〜10=最大）${painTrendText()}

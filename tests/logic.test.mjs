@@ -498,3 +498,23 @@ test('buildPrompt() はmustを上半身4種目、optionalを脚1〜2＋上半身
   assert.doesNotMatch(p, /2種目ともmust_exercises/);   // 旧ルールとの食い違いを残さない
   assert.doesNotMatch(p, /段階的に再開する提案/);
 });
+
+// ===== 記録は筋トレMEMO、ここは提案専用（2026-10-19） =====
+
+test('buildPrompt() は筋トレを直近5回、有酸素を直近7日として別々に渡す', () => {
+  const sessions = [];
+  for (let d = 1; d <= 7; d++) {
+    sessions.push({ id:'w'+d, date:`2026-09-0${d}`, exercises:[{ name:'ベンチプレス', sets:[{ weight:60+d, reps:8 }] }], next_menu:{ category:'Push' } });
+  }
+  for (let d = 10; d <= 20; d++) {
+    sessions.push({ id:'c'+d, type:'cardio', date:`2026-09-${d}`, cardio:'run', cardioMin:30 });
+  }
+  const p = loadApp({ today:'2026-09-21T09:00:00+09:00', storage:{ wac_sessions: JSON.stringify(sessions) } }).buildPrompt('1', 'none', null, 0);
+  const hist = p.split('【直近の筋トレ履歴')[1].split('【直近7日の有酸素運動】')[0];
+  assert.doesNotMatch(hist, /2026-09-02/);           // 6回前以前は入れない
+  assert.match(hist, /2026-09-03[\s\S]*2026-09-07/);  // 有酸素が多くても筋トレ5回分は残る
+  assert.doesNotMatch(hist, /有酸素のみ/);
+  const cardio = p.split('【直近7日の有酸素運動】')[1].split('【')[0];
+  assert.match(cardio, /2026-09-15/);
+  assert.doesNotMatch(cardio, /2026-09-14/);          // 7日より前は入れない
+});
