@@ -543,7 +543,8 @@ test('buildPrompt() は選んだジムの曜日別メニューを渡し、志村
   const shimura = loadApp({ today:'2026-10-19T20:00:00+09:00' }).buildPrompt('1', 'none', null, 0);   // 月 → 次は火
   assert.match(shimura, /■火（胸＋二頭）\n  必須（この順で固定）: 1\. マシンチェストプレス \/ 2\. マシンインクラインプレス \/ 3\. ペクトラルフライ（志村） \/ 4\. インクラインダンベルカール/);
   assert.match(shimura, /■水（背中＋三頭）\n  必須（この順で固定）: 1\. フロントプル .* 5\. フレンチプレス/);
-  assert.match(shimura, /■金（胸と背中）\n  必須（この順で固定）: 1\. マシンチェストプレス \/ 2\. マシンインクラインプレス \/ 3\. チンニング（縦グリップ）/);
+  assert.match(shimura, /■金（肩）\n  必須（この順で固定）: 1\. ショルダープレス（志村マシン）/);
+  assert.match(shimura, /■土（胸と背中）\n  必須（この順で固定）: 1\. マシンチェストプレス \/ 2\. マシンインクラインプレス \/ 3\. チンニング（縦グリップ）/);
   assert.match(shimura, /ケーブルマシンは使えません/);
   assert.match(shimura, /must_exercisesは、次回（火）の「必須」4種目を上の順番/);
   const hongo = loadApp({ today:'2026-10-20T20:00:00+09:00' }).buildPrompt('2', 'none', null, 0);   // 火 → 次は水
@@ -553,14 +554,15 @@ test('buildPrompt() は選んだジムの曜日別メニューを渡し、志村
   for (const p of [shimura, hongo]) assert.match(p, /バーベルのベンチプレス・バーベルロウ・デッドリフト/);
 });
 
-test('DAY_MENUS は両店舗とも火・金・土が4種目、水が5種目で、志村にケーブル種目がなく、金曜は火・水と同じ種目', () => {
+test('DAY_MENUS は両店舗とも火・金・土が4種目、水が5種目で、志村にケーブル種目がなく、土曜は火・水と同じ種目', () => {
   const m = app().$('DAY_MENUS');
   for (const g of ['1', '2']) {
     for (const d of ['tue', 'fri', 'sat']) assert.equal(m[g][d].must.length, 4, `${g} ${d}`);
     assert.equal(m[g].wed.must.length, 5, `${g} wed`);
-    // 金曜の種目は火曜か水曜の種目（志村の縦引きだけはチンニング）
+    // 土曜の種目は火曜か水曜の種目（志村の縦引きだけはチンニング）
     const earlier = new Set([...m[g].tue.must, ...m[g].wed.must, 'チンニング（縦グリップ）']);
-    for (const n of m[g].fri.must) assert.ok(earlier.has(n), `${g} fri ${n}`);
+    for (const n of m[g].sat.must) assert.ok(earlier.has(n), `${g} sat ${n}`);
+    assert.ok(m[g].fri.must.some(n => /ショルダープレス/.test(n)), `${g} fri`);
   }
   const shimuraNames = ['tue','wed','fri','sat'].flatMap(d => [...m['1'][d].must, ...m['1'][d].optional]);
   assert.ok(shimuraNames.every(n => !/ケーブル|ロープ/.test(n)), shimuraNames.join(','));
@@ -633,7 +635,9 @@ test('buildPrompt() は曜日で部位と脚タイプを指定し、ロング走
   assert.match(tue, /next_menu.categoryには「背中＋三頭」/);
   assert.match(tue, /脚種目を外すのはロング走の日（水曜）だけ/);
   const fri = loadApp({ today:'2026-10-23T20:00:00+09:00' }).buildPrompt('1', 'run', null, 0);
-  assert.match(fri, /次回の筋トレは「土（肩）」の予定です。次回メニューの脚はタイプCにしてください/);
+  assert.match(fri, /次回の筋トレは「土（胸と背中）」の予定です。次回メニューの脚はタイプCにしてください。胸と背中は火・水と同じ種目。Cはブルガリアンスクワットを優先する/);
+  const wed = loadApp({ today:'2026-10-21T20:00:00+09:00' }).buildPrompt('1', 'none', null, 0);
+  assert.match(wed, /次回の筋トレは「金（肩）」の予定です。次回メニューの脚はタイプAにしてください/);
   const sat = loadApp({ today:'2026-10-24T20:00:00+09:00' }).buildPrompt('1', 'none', null, 0);
   assert.match(sat, /次回の筋トレは「日（その週に足りない部位）」の予定です。次回メニューの脚は週の脚のセット数が目標を下回るときだけ/);
   assert.match(sat, /次回は日曜（その週に足りない部位）です。must_exercisesは、上の火〜土の「必須」から4種目/);
@@ -641,11 +645,11 @@ test('buildPrompt() は曜日で部位と脚タイプを指定し、ロング走
   assert.match(sun, /次回の筋トレは「火（胸＋二頭）」の予定です。次回メニューの脚はタイプBにしてください。翌日がロング走なのでBは軽め/);
 });
 
-test('チンニングが今週まだなら、土曜は余裕枠・日曜はmustに入れさせる。済みならそう伝える', () => {
+test('チンニングが今週まだなら、日曜はmustに入れさせ、土曜までは予定どおり。済みならそう伝える', () => {
   const none = loadApp({ today:'2026-10-24T20:00:00+09:00' }).buildPrompt('1', 'none', null, 0);   // 土 → 次は日
   assert.match(none, /今週のチンニング: まだ。.*日曜のmust_exercisesに必ずチンニング（縦グリップ）/);
   const fri = loadApp({ today:'2026-10-23T20:00:00+09:00' }).buildPrompt('1', 'none', null, 0);    // 金 → 次は土
-  assert.match(fri, /土曜の余裕枠の先頭にチンニング/);
+  assert.match(fri, /今週のチンニング: まだ。.*土曜までのメニューに入っているので、そのとおりに/);
   const done = loadApp({ today:'2026-10-24T20:00:00+09:00', storage:{ wac_sessions: JSON.stringify([
     { id:'a', date:'2026-10-21', exercises:[{ name:'チンニング（縦グリップ）', sets:[{ weight:null, reps:8 }] }] },
   ]) } }).buildPrompt('1', 'none', null, 0);
