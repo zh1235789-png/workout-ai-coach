@@ -157,3 +157,39 @@ test('起動時、同じオリジンにハムリハの記録があれば一度�
 test('バイクの単位設定はバックアップ対象に入っている', () => {
   assert.ok(app().$('BACKUP_KEYS').includes('wac_bike_unit'));
 });
+
+// ---- バイク30/15（2026-10-21追加）----
+
+const b3Session = (date, w, extra = {}) => ({
+  id: 'b3-' + date, type: 'cardio', date, cardio: 'bike3015', cardioMin: null, cardioKm: null,
+  b3015: { unit: 'W', w, lv: null, hr: [null, null, null], rpe: null, ...extra },
+});
+
+test('b3015Avg()/b3015Sets() は入力済みのセットだけ数える', () => {
+  const a = app();
+  assert.equal(a.b3015Avg({ w: [250, 240, null] }), 245);
+  assert.equal(a.b3015Sets({ w: [250, 240, null] }), 2);
+  assert.equal(a.b3015Avg({ w: [null, null, null] }), null);
+  assert.equal(a.b3015Avg(undefined), null);
+});
+
+test('b3015Fade() は最後のセットが1セット目から5%以上落ちたら true', () => {
+  const a = app();
+  assert.equal(a.b3015Fade({ w: [200, 195, 189] }), true);
+  assert.equal(a.b3015Fade({ w: [200, 190, null] }), false);
+  assert.equal(a.b3015Fade({ w: [200, null, null] }), null);
+});
+
+test('30/15は4×4と別に集計され、前回比はRPMだと同じレベルの回とだけ比べる', () => {
+  const a = app(withSessions([
+    bikeSession('2026-10-03', [200, 200, 200, 200]),
+    b3Session('2026-10-05', [80, 78, null], { unit: 'RPM', lv: 8 }),
+    b3Session('2026-10-12', [85, 84, 83], { unit: 'RPM', lv: 9 }),
+  ]));
+  assert.equal(a.b3015Sessions().length, 2);
+  assert.equal(a.bikeSessions().length, 1);
+  const prev = a.b3015Prev({ unit: 'RPM', lv: 8, w: [82] }, { date: '2026-10-19' });
+  assert.equal(prev.ds, '2026-10-05');
+  assert.equal(a.b3015SummaryLabel({ unit: 'W', w: [250, 240, null], lv: 7, hr: [170, 175, null], rpe: 9 }),
+    '2セット 平均245W L7 最高心拍175 RPE9');
+});
