@@ -32,6 +32,22 @@ header{background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;padding:cal
 header h1{font-size:17px;font-weight:700}
 header .sub{color:rgba(255,255,255,.85);font-size:12px;margin-top:2px}
 main{padding:14px;max-width:560px;margin:0 auto}
+/* 週間スケジュール */
+.wk details summary{cursor:pointer;font-weight:700;font-size:15px;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.wk details summary::-webkit-details-marker{display:none}
+.wk details[open] .wk-caret{transform:rotate(180deg)}
+.wk-caret{color:var(--sub);transition:transform .2s}
+.wk-next{font-size:12.5px;color:var(--sub);margin-top:4px}
+.wk-row{display:flex;gap:10px;padding:9px 6px;border-top:1px solid var(--border)}
+.wk-row:first-of-type{margin-top:10px}
+.wk-row.today{background:var(--accent-soft);border-radius:8px}
+.wk-day{font-weight:700;width:22px;flex-shrink:0}
+.wk-body{flex:1;min-width:0;font-size:13.5px}
+.wk-focus{font-weight:700}
+.wk-meta{color:var(--sub);font-size:12px;margin-top:2px}
+.wk-ex{font-size:12px;margin-top:3px;line-height:1.5}
+.wk-tag{display:inline-block;font-size:11px;font-weight:700;color:#fff;background:var(--accent);border-radius:6px;padding:1px 6px;margin-left:6px}
+.wk-off{color:var(--sub)}
 .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
 .card h2{font-size:14px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
 .sub{color:var(--sub);font-size:12px;line-height:1.5}
@@ -504,7 +520,7 @@ function renderHome(){
     menuHtml = `<div class="card"><h2>🎯 今日のメニュー</h2><div class="sub">まだ提案がありません。筋トレ後に下の手順でClaudeに送ると、次回のメニューがここに表示されます。</div></div>`;
   }
 
-  let html = menuHtml + `<div class="card">
+  let html = menuHtml + renderWeekScheduleCard(state.selectedGym) + `<div class="card">
     <h2>📍 次回行くジム</h2>
     <div class="seg">
       <button data-gym="1" class="gym-btn${state.selectedGym==='1'?' sel':''}">志村坂上店</button>
@@ -2769,6 +2785,10 @@ function bindEvents(){
     };
   });
 
+  // 週間スケジュールの開閉は再描画（ジム切替など）でも保つ
+  const wkDetails = document.getElementById('wkDetails');
+  if(wkDetails) wkDetails.addEventListener('toggle', ()=>{ state.weekOpen = wkDetails.open; });
+
   const btnCopyPrompt = document.getElementById('btnCopyPrompt');
   if(btnCopyPrompt) btnCopyPrompt.onclick = async ()=>{
     const prompt = buildPrompt(state.selectedGym, state.cardio, null, state.pain);
@@ -3221,6 +3241,38 @@ ${chinRule}
 optional_exercisesの上半身は、その曜日の「余裕枠の上半身候補」から選び、脚は【週の予定】と【脚トレ】に従ってください。週の部位別セット数で目標を下回る部位があれば、余裕枠の上半身をその部位に回してください。
 手首を痛めているため、バーベルのベンチプレス・バーベルロウ・デッドリフト・ストレートバーを握る種目、逆手のチンニングは提案しないでください。${gymId==='1' ? '\nこのジム（志村坂上）ではケーブルマシンは使えません。設備リストにあってもケーブル種目は提案しないでください。' : ''}
 `;
+}
+
+// 週間スケジュールのカード（WEEK_PLAN と選んでいるジムの DAY_MENUS から作る）
+function renderWeekScheduleCard(gymId, dateStr){
+  const today = dateStr || todayStr();
+  const [y,m,d] = today.split('-').map(Number);
+  const wdToday = new Date(y, m-1, d).getDay();
+  const next = nextGymSlot(today);
+  const menus = DAY_MENUS[gymId] || {};
+  const legLabel = l => l === null ? '脚なし' : l === '不足時のみ' ? '脚は足りないときだけ' : `脚${l}`;
+  let rows = '';
+  [1,2,3,4,5,6,0].forEach(wd=>{
+    const label = '日月火水木金土'[wd];
+    const slot = WEEK_PLAN.find(p=>p.days.includes(wd));
+    const cls = 'wk-row' + (wd === wdToday ? ' today' : '');
+    if(!slot){
+      rows += `<div class="${cls}"><div class="wk-day">${label}</div><div class="wk-body wk-off">休み（手術日）</div></div>`;
+      return;
+    }
+    const menu = menus[slot.key];
+    const ex = menu ? menu.must.map((n,i)=>`${i+1}. ${escapeHtml(n)}`).join('<br>') : escapeHtml(slot.note || '');
+    rows += `<div class="${cls}"><div class="wk-day">${label}</div><div class="wk-body">
+      <div class="wk-focus">${escapeHtml(slot.focus)}・${escapeHtml(legLabel(slot.leg))}${slot === next ? '<span class="wk-tag">次回</span>' : ''}</div>
+      <div class="wk-meta">${escapeHtml(slot.run)}</div>
+      <div class="wk-ex">${ex}</div>
+    </div></div>`;
+  });
+  return `<div class="card wk"><details id="wkDetails"${state.weekOpen ? ' open' : ''}>
+    <summary>🗓 週間スケジュール<span class="wk-caret">▾</span></summary>
+    <div class="wk-next">次回は${escapeHtml(next.label)}曜：${escapeHtml(next.focus)}・${escapeHtml(legLabel(next.leg))}（${escapeHtml(GYM_NAMES[gymId] ? (gymId==='1'?'志村坂上':'本郷') : '')}の種目）</div>
+    ${rows}
+  </details></div>`;
 }
 
 // 新しい刺激枠（next_menu.bonus_exercise）の直近の提案。同じ種目を続けて出さないために渡す

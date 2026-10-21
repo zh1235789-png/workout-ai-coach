@@ -665,3 +665,21 @@ test('週の予定で日曜はバイク4×4を筋トレ前に行う', () => {
   const p = app().buildPrompt('1', 'none', null, 0);
   assert.match(p, /- 日: その週に足りない部位 \/ ラン=バイク4×4（筋トレ前。余裕がある週は30\/15に替えてもよい）/);
 });
+
+// ===== 週間スケジュールのカード（2026-10-21） =====
+
+test('renderWeekScheduleCard() は月〜日を並べ、月・木は休み、今日と次回を示し、選んだジムの種目を出す', () => {
+  const a = app();
+  const h = a.renderWeekScheduleCard('1', '2026-10-21');   // 水
+  const days = [...h.matchAll(/<div class="wk-day">(.)<\/div>/g)].map(m => m[1]).join('');
+  assert.equal(days, '月火水木金土日');
+  assert.equal((h.match(/休み（手術日）/g) || []).length, 2);
+  assert.match(h, /class="wk-row today"><div class="wk-day">水/);
+  assert.match(h, /肩・脚A<span class="wk-tag">次回<\/span>/);
+  assert.match(h, /次回は金曜：肩・脚A（志村坂上の種目）/);
+  assert.match(h, /1\. フロントプル/);
+  assert.match(h, /バイク4×4（筋トレ前/);
+  const hongo = a.renderWeekScheduleCard('2', '2026-10-21');
+  assert.match(hongo, /1\. チンニング（縦グリップ）/);
+  assert.doesNotMatch(hongo, /フロントプル/);
+});
