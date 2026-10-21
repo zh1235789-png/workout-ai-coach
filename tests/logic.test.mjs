@@ -660,3 +660,8 @@ test('チンニングが今週まだなら、日曜はmustに入れさせ、土�
   ]) } }).buildPrompt('1', 'none', null, 0);
   assert.match(last, /今週のチンニング: まだ/);
 });
+
+test('週の予定で日曜はバイク4×4を筋トレ前に行う', () => {
+  const p = app().buildPrompt('1', 'none', null, 0);
+  assert.match(p, /- 日: その週に足りない部位 \/ ラン=バイク4×4（筋トレ前。余裕がある週は30\/15に替えてもよい）/);
+});
