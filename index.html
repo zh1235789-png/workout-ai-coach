@@ -68,6 +68,8 @@ label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weigh
 .seg{display:flex;background:var(--bg);border-radius:10px;padding:3px;gap:3px}
 .seg button{flex:1;padding:9px 0;border:none;border-radius:8px;background:transparent;color:var(--sub);font-size:13px;font-weight:600}
 .seg button.sel{background:var(--card);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg.wrap{flex-wrap:wrap}
+.seg.wrap button{flex:1 0 22%;white-space:nowrap}
 .step-num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:700}
 .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:20px auto}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -232,6 +234,8 @@ input[type=number].vol-target{width:64px;flex:0 0 64px;padding:9px 4px;text-alig
 .dot-walk{background:#3b82f6}
 .dot-bike{background:#8b5cf6}
 .dot-bike3015{background:#d946ef}
+.dot-kb{background:#f59e0b}
+.dot-kbtabata{background:#ea580c}
 .cal-legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:11px;color:var(--sub)}
 .cal-legend span{display:flex;align-items:center;gap:4px}
 .cal-legend-total{margin-left:auto;font-weight:700}
@@ -295,8 +299,11 @@ const BACKUP_KEYS = [LS_KEY_SESSIONS, LS_KEY_CONDITION, LS_KEY_GYM_EQUIP_1, LS_K
 const DEFAULT_CONDITION = '左ハムストリング肉離れ(2026-07-04受傷)から回復し、脚トレは再開済み。痛みが出ない範囲で漸進的に。目的は健康維持・筋力向上・体脂肪率の低下。筋トレ週5回(火=胸＋三頭・水=背中＋二頭・金=肩・土=胸と背中・日=その週に足りない部位)、ランニング週3回(Garminコーチ5K・Greg McMillan、火・水ロング走・金。火か金にインターバル走やテンポ走が入る週がある)、日曜の筋トレ前にバイク4×4(余裕がある週は30/15を2〜3セットに替えてもよい。ランにスピード練習があった週は30/15にせず4×4のまま)。月・木は手術日でオフ。';
 
 const GYM_NAMES = { '1': 'エニタイムフィットネス志村坂上店', '2': 'エニタイムフィットネス文京本郷店（本郷三丁目）' };
-const CARDIO_LABELS = { 'none': 'なし', 'walk': 'ウォーキング', 'run': 'ランニング', 'bike': 'バイク4×4', 'bike3015': 'バイク30/15' };
-const CARDIO_ICONS = { 'walk': '🚶', 'run': '🏃', 'bike': '🚴', 'bike3015': '🚴' };
+const CARDIO_LABELS = { 'none': 'なし', 'walk': 'ウォーキング', 'run': 'ランニング', 'bike': 'バイク4×4', 'bike3015': 'バイク30/15', 'kb': 'ケトルベル', 'kbtabata': 'KBタバタ' };
+const CARDIO_ICONS = { 'walk': '🚶', 'run': '🏃', 'bike': '🚴', 'bike3015': '🚴', 'kb': '🏋️', 'kbtabata': '🏋️' };
+// 自宅（ベランダ）のケトルベル。メニューはハムリハのフェーズに従う（スイングはPhase 4から）。
+const KB_KINDS = ['kb','kbtabata'];
+const isKb = (k)=>KB_KINDS.includes(k);
 function cardioName(kind){ return `${CARDIO_ICONS[kind]||''} ${CARDIO_LABELS[kind]||kind}`; }
 const DEFAULT_EQUIP_1 = `【マシン種目】チェストプレス、インクラインプレス、ペクトラルフライ、リアデルトフライ、ショルダープレス、DPLショルダープレス、ラテラルレイズ、シーテッドロウ、DPLシーテッドロウ、プルダウン、Tバーロウ、ディップ、チンニング、プリチャーカール、シーテッドアームカール、ロータリートルソー、アブドミナル、レッグエクステンション、レッグカール、レッグプレス、アングルドレッグプレス、インナーサイ、アウターサイ、グルートブリッジ、ハックスクワット、アイソラテラル系マシン各種
 【フリーウェイト種目（パワーラック・スミスマシン・ダンベル・ベンチ）】ベンチプレス、インクラインベンチプレス、ダンベルベンチプレス、インクラインダンベルプレス、ダンベルフライ、スミスベンチプレス、スミスインクラインプレス、バーベルロウ、ダンベルロウ、ワンハンドロウ、デッドリフト、ルーマニアンデッドリフト、シュラッグ、ダンベルプルオーバー、バーベルショルダープレス、ダンベルショルダープレス、アーノルドプレス、サイドレイズ、フロントレイズ、リアレイズ、リアデルトフライ、アップライトロウ、バーベルカール、ダンベルカール、ハンマーカール、インクラインカール、コンセントレーションカール、スカルクラッシャー、フレンチプレス、キックバック、スクワット、スミススクワット、フロントスクワット、ブルガリアンスクワット、ランジ、ヒップスラスト、カーフレイズ
@@ -310,7 +317,7 @@ const DEFAULT_EQUIP_2 = `【マシン種目(PRECOR製)】チェストプレス�
 【保有器具】パワーラック(3台)、スミスマシン、ケーブルマシン、ダンベル、ベンチ、ストレッチエリア、体組成計
 【有酸素(PRECOR製)】トレッドミル(8台)、クロストレーナー(2台)、リカンベントバイク(2台)、アップライトバイク(2台)`;
 
-let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, bikeDraft: null, b3015Draft: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null, pickerTarget: null, pain: null, trendEx: null, cardioMin: null, cardioKm: null, filterDate: null, pasteText: null };
+let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, bikeDraft: null, b3015Draft: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null, pickerTarget: null, pain: null, trendEx: null, cardioMin: null, cardioKm: null, kbNote: null, filterDate: null, pasteText: null };
 
 function getSessions(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_SESSIONS)||'[]'); }catch(e){ return []; } }
 function saveSessions(list){ localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list)); }
@@ -328,7 +335,7 @@ function switchTab(tab){
 
 /* ===== 記録途中の下書き（タブ切替・アプリ終了でも残す） ===== */
 const LS_KEY_DRAFT = 'wac_draft';
-const DRAFT_KEYS = ['entryRows','entryRowsFromMenu','cardio','bikeDraft','b3015Draft','cardioMin','cardioKm','pain','pasteText','pendingResult'];
+const DRAFT_KEYS = ['entryRows','entryRowsFromMenu','cardio','bikeDraft','b3015Draft','cardioMin','cardioKm','kbNote','pain','pasteText','pendingResult'];
 
 function saveDraft(){
   try{
@@ -350,7 +357,7 @@ function draftHasContent(d){
   const setUsed = (d.entryRows||[]).some(r=>(r.sets||[]).some(x=>String(x.weight||'')!=='' || String(x.reps||'')!==''));
   const customRow = !d.entryRowsFromMenu && (d.entryRows||[]).some(r=>(r.name||'').trim());
   return setUsed || customRow || !!d.pasteText || !!d.pendingResult
-    || d.cardioMin != null && d.cardioMin !== '' || d.cardioKm != null && d.cardioKm !== ''
+    || d.cardioMin != null && d.cardioMin !== '' || d.cardioKm != null && d.cardioKm !== '' || !!d.kbNote
     || (d.cardio && d.cardio !== 'none') || (d.pain != null && d.pain > 0)
     || (d.bikeDraft && bikeAvg(d.bikeDraft) !== null)
     || (d.b3015Draft && b3015Avg(d.b3015Draft) !== null);
@@ -484,6 +491,7 @@ function capturePendingInputs(opts){
   const grab = (id, key)=>{ const el = document.getElementById(id); if(el) state[key] = el.value; };
   grab('cardioMin', 'cardioMin');
   grab('cardioKm', 'cardioKm');
+  grab('kbNote', 'kbNote');
   grab('inputCardioDate', 'cardioLogDate');
   grab('inputPaste', 'pasteText');
 }
@@ -533,19 +541,23 @@ function renderHome(){
   html += `<div class="card">
     <h2>🏃 有酸素運動を記録</h2>
     <div class="sub" style="margin-bottom:8px">筋トレとは別の記録として保存されます。筋トレと同じ日でも、有酸素だけの日でも、そのまま記録してください。</div>
-    <div class="seg">
+    <div class="seg wrap">
       <button data-cardio="none" class="cardio-btn${state.cardio==='none'?' sel':''}">なし</button>
       <button data-cardio="walk" class="cardio-btn${state.cardio==='walk'?' sel':''}">ウォーキング</button>
       <button data-cardio="run" class="cardio-btn${state.cardio==='run'?' sel':''}">ランニング</button>
       <button data-cardio="bike" class="cardio-btn${state.cardio==='bike'?' sel':''}">バイク4×4</button>
       <button data-cardio="bike3015" class="cardio-btn${state.cardio==='bike3015'?' sel':''}">バイク30/15</button>
+      <button data-cardio="kb" class="cardio-btn${state.cardio==='kb'?' sel':''}">ケトルベル</button>
+      <button data-cardio="kbtabata" class="cardio-btn${state.cardio==='kbtabata'?' sel':''}">KBタバタ</button>
     </div>
     ${state.cardio==='bike' ? renderBikeInputs(state.bikeDraft || (state.bikeDraft = emptyBike()), { date: state.cardioLogDate || todayStr() }, 'log') : ''}
     ${state.cardio==='bike3015' ? renderB3015Inputs(state.b3015Draft || (state.b3015Draft = emptyB3015()), { date: state.cardioLogDate || todayStr() }, 'log') : ''}
     <div class="body-row" style="margin-top:10px">
       <input type="number" id="cardioMin" placeholder="時間（分）" inputmode="numeric" value="${escapeAttr(state.cardioMin||'')}">
-      ${(state.cardio==='bike' || state.cardio==='bike3015') ? '' : `<input type="number" id="cardioKm" placeholder="距離（km）" inputmode="decimal" step="0.1" value="${escapeAttr(state.cardioKm||'')}">`}
+      ${(state.cardio==='bike' || state.cardio==='bike3015' || isKb(state.cardio)) ? '' : `<input type="number" id="cardioKm" placeholder="距離（km）" inputmode="decimal" step="0.1" value="${escapeAttr(state.cardioKm||'')}">`}
     </div>
+    ${isKb(state.cardio) ? `<input type="text" id="kbNote" style="margin-top:8px;width:100%" placeholder="内容（例: スイング15回×5 16kg／片脚RDL 8×3）" value="${escapeAttr(state.kbNote||'')}">
+    <div class="sub" style="margin-top:4px">メニューはハムリハの今のフェーズのとおり（スイングはPhase 4から）。終わったら翌朝のハムの張りも確認。</div>` : ''}
     <div class="field" style="margin-top:10px;margin-bottom:0">
       <label>日付</label>
       <input type="date" id="inputCardioDate" value="${escapeAttr(state.cardioLogDate)}">
@@ -1055,8 +1067,8 @@ function cardioSummaryForDate(date){
   const list = cardioEntriesForDate(date);
   if(list.length === 0) return null;
   // 脚トレ可否の判断に効く順（ラン > バイク > ウォーキング）で代表を決める
-  const kind = ['run','bike','bike3015','walk'].find(k=>list.some(x=>x.cardio === k)) || 'walk';
-  const label = ['run','bike','bike3015','walk'].filter(k=>list.some(x=>x.cardio === k)).map(k=>CARDIO_LABELS[k]).join('＋');
+  const kind = ['run','bike','bike3015','kbtabata','kb','walk'].find(k=>list.some(x=>x.cardio === k)) || 'walk';
+  const label = ['run','bike','bike3015','kbtabata','kb','walk'].filter(k=>list.some(x=>x.cardio === k)).map(k=>CARDIO_LABELS[k]).join('＋');
   const sum = (key)=>{
     const vals = list.map(x=>x[key]).filter(v=>v != null);
     return vals.length ? vals.reduce((a,b)=>a+b, 0) : null;
@@ -1083,6 +1095,7 @@ function cardioDetailLabel(s){
   if(s.cardio === 'bike3015' && s.b3015){ const b = b3015SummaryLabel(s.b3015); if(b) parts.push(b); }
   if(s.cardioMin != null) parts.push(`${s.cardioMin}分`);
   if(s.cardioKm != null) parts.push(`${s.cardioKm}km`);
+  if(s.kbNote) parts.push(s.kbNote);
   return parts.length ? `（${parts.join(' / ')}）` : '';
 }
 
@@ -1969,6 +1982,9 @@ function renderEditForm(d){
     html += `<button class="sel">バイク4×4</button>`;
   } else if(isCardioOnly && d.cardio === 'bike3015'){
     html += `<button class="sel">バイク30/15</button>`;
+  } else if(isCardioOnly && isKb(d.cardio)){
+    html += `<button data-cardio="kb" class="ed-cardio-btn${d.cardio==='kb'?' sel':''}">ケトルベル</button>
+      <button data-cardio="kbtabata" class="ed-cardio-btn${d.cardio==='kbtabata'?' sel':''}">KBタバタ</button>`;
   } else if(isCardioOnly){
     html += `<button data-cardio="walk" class="ed-cardio-btn${d.cardio==='walk'?' sel':''}">ウォーキング</button>
       <button data-cardio="run" class="ed-cardio-btn${d.cardio==='run'?' sel':''}">ランニング</button>`;
@@ -2242,6 +2258,8 @@ function renderCalendar(sessions){
       <span><span class="dot dot-walk"></span>ウォーキング</span>
       <span><span class="dot dot-bike"></span>バイク4×4</span>
       <span><span class="dot dot-bike3015"></span>30/15</span>
+      <span><span class="dot dot-kb"></span>ケトルベル</span>
+      <span><span class="dot dot-kbtabata"></span>KBタバタ</span>
       <span class="cal-legend-total">有酸素 ${cntCardio}日</span>
     </div>
   </div>`;
@@ -2443,6 +2461,8 @@ function bindEvents(){
       const mn = document.getElementById('cardioMin'), km = document.getElementById('cardioKm');
       if(mn) state.cardioMin = mn.value;
       if(km) state.cardioKm = km.value;
+      const kn = document.getElementById('kbNote');
+      if(kn) state.kbNote = kn.value;
       state.cardio = b.dataset.cardio;
       state.cardioError = null;
       render();
@@ -2538,6 +2558,8 @@ function bindEvents(){
   if(cardioMin) cardioMin.oninput = ()=>{ state.cardioMin = cardioMin.value; };
   const cardioKm = document.getElementById('cardioKm');
   if(cardioKm) cardioKm.oninput = ()=>{ state.cardioKm = cardioKm.value; };
+  const kbNoteEl = document.getElementById('kbNote');
+  if(kbNoteEl) kbNoteEl.oninput = ()=>{ state.kbNote = kbNoteEl.value; };
 
   const inputCardioDate = document.getElementById('inputCardioDate');
   if(inputCardioDate) inputCardioDate.onchange = ()=>{ state.cardioLogDate = inputCardioDate.value; render(); };
@@ -2553,7 +2575,7 @@ function bindEvents(){
   const btnLogCardio = document.getElementById('btnLogCardio');
   if(btnLogCardio) btnLogCardio.onclick = ()=>{
     if(state.cardio==='none'){
-      state.cardioError = '「なし」以外（ウォーキング・ランニング・バイク）を選んでから記録してください。';
+      state.cardioError = '「なし」以外（ウォーキング・ランニング・バイク・ケトルベル）を選んでから記録してください。';
       render();
       return;
     }
@@ -2576,8 +2598,9 @@ function bindEvents(){
         cardio: state.cardio,
         pain: state.pain != null ? state.pain : null,
         cardioMin: numOrNull(state.cardioMin),
-        cardioKm: (state.cardio==='bike' || state.cardio==='bike3015') ? null : numOrNull(state.cardioKm)
+        cardioKm: (state.cardio==='bike' || state.cardio==='bike3015' || isKb(state.cardio)) ? null : numOrNull(state.cardioKm)
       };
+      if(isKb(state.cardio) && (state.kbNote||'').trim()) entry.kbNote = state.kbNote.trim();
       if(state.cardio==='bike') entry.bike = JSON.parse(JSON.stringify(state.bikeDraft));
       if(state.cardio==='bike3015') entry.b3015 = JSON.parse(JSON.stringify(state.b3015Draft));
       sessions.push(entry);
@@ -2586,7 +2609,7 @@ function bindEvents(){
       // 続けて押しても二重に登録されないよう、有酸素の入力だけリセットする
       // （筋トレの入力を退避してから、有酸素だけを消して再描画する）
       capturePendingInputs();
-      state.cardio = 'none'; state.cardioMin = null; state.cardioKm = null; state.bikeDraft = null; state.b3015Draft = null;
+      state.cardio = 'none'; state.cardioMin = null; state.cardioKm = null; state.kbNote = null; state.bikeDraft = null; state.b3015Draft = null;
       state.error = null; state.cardioError = null;
       render({ skipCapture: true });
       const msg = document.getElementById('cardioLogSaved');
@@ -3394,6 +3417,12 @@ ${workoutText ? '' : '写真から読み取れるのは今日の分だけです�
 【今日の有酸素運動】${cardioLabel}${cardioAmountLabel}
 脚種目を外すのはロング走の日（水曜）だけです。火・金の朝ラン（Garminコーチ5K）の日は、午後の筋トレで【週の予定】どおりに脚を入れてかまいません。ただし朝にインターバル走やテンポ走をした日は、脚種目の重量を前回から上げず据え置いてください。今日ロング走をしていて、今回のトレーニング内容に脚種目が含まれていれば評価コメントで軽く触れてください。
 今日バイク30/15（高強度インターバル）をしてから筋トレする日は、脚は疲れているので次回の脚種目の重量を据え置きにし、notesでその旨を伝えてください。
+
+【自宅のケトルベル】
+ジムとは別に、自宅のベランダで16kgのケトルベルを週1〜2回やっています（曜日は決めていない）。中身はハムリハのフェーズどおりで、ケトルベル・デッドリフト／RDL／片脚RDL／ゴブレットスクワット、Phase 4からは両手スイング。「KBタバタ」は20秒動く／10秒休む×8本で、疲れてフォームが崩れやすい分ハムへの負担が大きいものとして扱ってください。記録は上の【直近7日の有酸素運動】に「ケトルベル」「KBタバタ」として入ります（内容のメモ付き）。
+- ケトルベルはハムに伸張負荷がかかるヒップヒンジが中心です。前日か当日にケトルベル（特にKBタバタ）をしていたら、脚Cはダンベルのルーマニアンデッドリフトではなくブルガリアンスクワットにし、脚種目の重量は前回から上げず据え置いてください
+- ケトルベルの回数は上の【部位別セット数】に入っていません。その週にケトルベルをやっていれば、ハム・お尻のセット数が少し足りなくても日曜の脚の補充は省いてかまいません
+- 置く日の目安はハムリハの決まり（ラン日・ジムの脚の日の前日は避ける）です。今の週の予定なら日曜（翌日の月曜はオフ）が一番よく、次が土曜の夜です。直近7日に月・木・金の夜のケトルベルがあった場合は、notesで日曜か土曜に移すよう一言添えてください
 
 【次回トレーニングを行うジム】${gymName}
 【このジムの設備】
