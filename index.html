@@ -249,6 +249,13 @@ input[type=number].vol-target{width:64px;flex:0 0 64px;padding:9px 4px;text-alig
 .tabbar button{flex:1;background:none;border:none;padding:10px 0 8px;color:var(--sub);font-size:11px;display:flex;flex-direction:column;align-items:center;gap:3px}
 .tabbar button .ic{font-size:20px}
 .tabbar button.sel{color:var(--accent)}
+.st-item{border-top:1px solid var(--border)}
+.st-item:first-of-type{border-top:0}
+.st-item summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;font-size:15px}
+.st-item summary::-webkit-details-marker{display:none}
+.st-item summary::after{content:"▾";color:var(--sub)}
+.st-item[open] summary::after{content:"▴"}
+.st-item ol{margin:0 0 10px;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:14px}
 .detail-close{float:right;color:var(--sub);font-size:13px}
 .saved-badge{display:inline-block;background:var(--ok-bg);color:var(--ok);font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;margin-bottom:10px}
 </style>
@@ -280,6 +287,7 @@ input[type=number].vol-target{width:64px;flex:0 0 64px;padding:9px 4px;text-alig
   <button data-tab="home" class="tab-btn"><span class="ic">📝</span>記録</button>
   <button data-tab="history" class="tab-btn"><span class="ic">📋</span>履歴</button>
   <button data-tab="trends" class="tab-btn"><span class="ic">📈</span>推移</button>
+  <button data-tab="stretch" class="tab-btn"><span class="ic">🧘</span>ストレッチ</button>
   <button data-tab="settings" class="tab-btn"><span class="ic">⚙️</span>設定</button>
 </nav>
 
@@ -501,6 +509,151 @@ function commitRows(rows){
   render({ rowsFromState: true });
 }
 
+// ストレッチ（2026-10-28 ハムリハから移した。ハムリハは使わなくなったため、こちらを正本にする）
+const STRETCH_GROUPS = [
+  { key:'morning', label:'🌅 朝・ラン前（動的）', note:'体を温めて可動域を出すのが目的。ここでは静的に伸ばして止めない。', items:[
+    { id:'s_cat', name:'キャットアンドカウ', time:'8回', steps:[
+      '四つ這いになり、手は肩の真下、膝は腰の真下に置く',
+      '息を吸いながら背中を反らせ、お腹を下に落として天井を見上げる（カウ）',
+      '息を吐きながら背中を丸め、おへそを見るように顎を引く（キャット）',
+      'ゆっくり8回繰り返す。腰だけでなく背骨全体を丸める・反らす意識で'
+    ]},
+    { id:'s_shoulder_circle', name:'肩回し', time:'前後各10回', steps:[
+      '立った状態で、指先ではなく腕全体を大きく使って回す',
+      '肩甲骨から動かす意識で、耳と肩の距離を離すように',
+      '前回し10回 → 後ろ回し10回'
+    ]},
+    { id:'s_hip_circle', name:'股関節回し', time:'各方向10回', steps:[
+      '骨盤の横に手を当てて立つ',
+      '片膝を高く上げて、股関節から大きな円を描くように内回し10回 → 外回し10回',
+      '反対脚も同様に行う'
+    ]},
+    { id:'s_leg_swing', name:'レッグスイング', time:'前後・左右 各10回', steps:[
+      '壁や柱に手をついて片脚立ちになる',
+      '軸脚の膝を軽く緩め、振る脚を前後に大きく10回スイング',
+      '同様に横方向（体の前を通す）にも10回スイング',
+      'ハムストリングはまだ冷えているので、勢いをつけすぎず温める程度に留める'
+    ]},
+    { id:'s_lunge_twist', name:'ウォーキングランジ＋ツイスト', time:'左右5歩ずつ', steps:[
+      '大きく一歩踏み出し、後ろ膝が床に近づくまで腰を落とす',
+      '上体を前脚側にゆっくりひねる',
+      '正面に戻してその足のまま次の一歩へ、左右5歩ずつ進む'
+    ]},
+  ]},
+  { key:'postrun', label:'🏃 ラン後（静的クールダウン）', note:'走って温まっている今が一番伸びやすいタイミング。呼吸を止めず、伸びを感じたら止まってキープ。', items:[
+    { id:'s_psoas', name:'腸腰筋ストレッチ（ハーフニーリング）', time:'左右30秒×2', steps:[
+      '片膝立ちになる（前脚は膝90度、後ろ脚の膝とすねを床につける）',
+      '反り腰にならないよう軽くお腹に力を入れたまま、骨盤を後傾させて体重を前へゆっくり移動',
+      '後ろ脚の付け根（股関節前面）が伸びるのを感じたら30秒キープ、左右2セットずつ'
+    ]},
+    { id:'s_piriformis', name:'梨状筋ストレッチ（仰向け4の字）', time:'左右30秒×2', steps:[
+      '仰向けに寝て両膝を立てる',
+      '片足首をもう片方の太ももに乗せ、4の字を作る',
+      '下の脚の太もも裏を両手で抱え、胸に向かってゆっくり引き寄せる',
+      '乗せた脚側のお尻の奥が伸びるのを感じたら30秒キープ、左右2セットずつ'
+    ]},
+    { id:'s_9090', name:'90/90ストレッチ', time:'左右30秒〜1分', steps:[
+      '床に座り、前脚は膝90度で体の前に、後ろ脚も膝90度で体の横〜後ろに置く',
+      '背筋を伸ばしたまま上体を前脚側へ倒す、または後ろ脚側へゆっくり回旋する',
+      '股関節の内旋・外旋どちらも伸びを感じたら左右30秒〜1分キープ'
+    ]},
+    { id:'s_ham', name:'ハムストリングストレッチ（座位前屈）', time:'左右20〜30秒', steps:[
+      '床に座り片脚を伸ばし、もう片方は膝を曲げて足裏を内ももに当てる',
+      '背中を丸めず、骨盤から前に倒すように伸ばした脚のつま先へ近づく',
+      '太もも裏に軽い突っ張りを感じる程度で20〜30秒',
+      '⚠️ 受傷側は痛み0〜1の範囲のみ。強い突っ張りが出たら即中止'
+    ]},
+    { id:'s_calf', name:'ふくらはぎストレッチ（壁押し）', time:'左右20秒', steps:[
+      '壁に手をつき、伸ばしたい脚を後ろに引く',
+      '後ろ脚のかかとを床につけたまま、前脚の膝を曲げて体重を前へ',
+      'ふくらはぎが伸びるのを感じたら20秒、左右'
+    ]},
+  ]},
+  { key:'night', label:'🛁 お風呂上がり・寝る前（静的・全身）', note:'1日の締めくくり。副交感神経を優位にして入眠準備。ゆっくり深く呼吸しながら行う。', items:[
+    { id:'s_towel_shoulder', name:'タオル肩回し', time:'30秒×2', steps:[
+      'タオルの両端を肩幅より広めに持つ',
+      '腕を伸ばしたまま頭上を通し、背中側までゆっくり回す → 前に戻す',
+      '30秒×2セット。詰まる場合は持ち手をさらに広げる'
+    ]},
+    { id:'s_tspine', name:'胸椎回旋ストレッチ（仰向け）', time:'左右30秒', steps:[
+      '仰向けに寝て両膝を立てる',
+      '両膝を揃えたまま片側にゆっくり倒す（腰から下だけひねる）',
+      '上半身は正面を向けたまま、上になった腕を天井 → 反対側の床へ開いていく',
+      '胸の前面〜肩甲骨内側が伸びるのを感じたら左右30秒'
+    ]},
+    { id:'s_scap', name:'肩甲骨はがし（四つ這い）', time:'10回', steps:[
+      '四つ這いになる',
+      '背中を丸めながら肩甲骨を左右に開く',
+      'ゆっくり戻しながら肩甲骨を寄せる',
+      'この開く・寄せるを呼吸に合わせて10回繰り返す'
+    ]},
+    { id:'s_psoas', name:'腸腰筋ストレッチ（ハーフニーリング）', time:'左右30秒', steps:[
+      '片膝立ちになり、後ろ脚の付け根が伸びるところまで体重を前へ',
+      '骨盤が反らないよう軽くお腹に力を入れたまま30秒キープ、左右'
+    ]},
+    { id:'s_piriformis', name:'梨状筋ストレッチ（仰向け4の字）', time:'左右30秒', steps:[
+      '仰向けで4の字を作り、下の脚を両手で抱えて胸へ引き寄せる',
+      'お尻の奥の伸びを感じながら30秒キープ、左右'
+    ]},
+    { id:'s_9090', name:'90/90ストレッチ', time:'左右30秒〜1分（深めに）', steps:[
+      '座って90/90の姿勢を作り、日中より少し長め・深めにキープ',
+      '呼吸を止めず、リラックスして力を抜きながら伸ばす'
+    ]},
+    { id:'s_ham', name:'ハムストリングストレッチ', time:'左右20〜30秒', steps:[
+      '座位前屈で軽く伸ばす。慎重に、痛みが出る手前で止める',
+      '張りが強い日はこの種目だけ省略してOK'
+    ]},
+  ]},
+  { key:'posture', label:'🐈 猫背矯正（すきま時間・毎日）', note:'縮こまった胸を開き、丸まって使えていない背中の筋肉を目覚めさせる。デスクワークの合間や夜のストレッチにプラスすると効果的。', items:[
+    { id:'s_pec', name:'胸筋ストレッチ（壁・ドア枠）', time:'左右30秒×2', steps:[
+      '壁やドア枠に片手を肩の高さでつく（手のひらを壁に押し当てる）',
+      '手を壁につけたまま、体だけを反対方向へゆっくり開いていく',
+      '胸の前面が伸びるのを感じたら30秒キープ、左右',
+      '余裕があれば手の位置を耳の高さ／肩の高さ／腰の高さの3段階に変えて行うと、胸筋の広い範囲が伸びる'
+    ]},
+    { id:'s_wallangel', name:'壁エンジェル', time:'10回', steps:[
+      'かかと・お尻・背中・後頭部を壁につけて立つ',
+      '腕を肩の高さでW字に上げ、手の甲を壁につける',
+      '腰が反りすぎないようお腹に軽く力を入れたまま、壁から手と肘が離れない範囲でゆっくり腕をYの字まで上げ下げする',
+      '肩甲骨を寄せる意識でゆっくり10回'
+    ]},
+    { id:'s_chintuck', name:'あご引き（チンタック）', time:'10回×2セット', steps:[
+      '立位または座位で正面を見たまま、あごを後ろにゆっくり引く（二重あごを作るイメージ）',
+      '首の後ろが軽く伸びるのを感じたら5秒キープして戻す',
+      '前に出た頭の位置を戻す運動。ゆっくり10回×2セット'
+    ]},
+    { id:'s_tspine_ext', name:'胸椎伸展ストレッチ（タオル/フォームローラー）', time:'30秒〜1分', steps:[
+      '仰向けになり、肩甲骨の下あたりに丸めたタオルやフォームローラーを横向きに置く',
+      '両手を頭の後ろで組み、頭を支えながら胸を天井に向けてゆっくり反らす',
+      '腰は反らさないよう、お腹に軽く力を入れたまま30秒〜1分キープ'
+    ]},
+  ]},
+];
+
+// その日のおすすめ: ランのある日は「朝・ラン前」と「ラン後」、毎晩「お風呂上がり」、猫背矯正はいつでも
+function stretchOrder(dateStr){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const wd = new Date(y, m-1, d).getDay();
+  const slot = WEEK_PLAN.find(p=>p.days.includes(wd));
+  const runDay = !!(slot && /ラン|走/.test(slot.run) && !/^なし/.test(slot.run));
+  return { runDay, keys: runDay ? ['morning','postrun','night','posture'] : ['night','posture','morning','postrun'] };
+}
+function renderStretch(){
+  const o = stretchOrder(todayStr());
+  let h = `<div class="card"><div class="sub">${o.runDay ? '今日はランの日：走る前に「朝・ラン前」、走った後に「ラン後」。' : '今日はランなし：夜の「お風呂上がり」を中心に。'}各種目をタップするとやり方が開きます。</div></div>`;
+  o.keys.forEach(k=>{
+    const g = STRETCH_GROUPS.find(x=>x.key===k);
+    if(!g) return;
+    h += `<div class="card"><h2>${escapeHtml(g.label)}</h2><div class="sub" style="margin-bottom:4px">${escapeHtml(g.note)}</div>`;
+    g.items.forEach(it=>{
+      h += `<details class="st-item"><summary><span>${escapeHtml(it.name)} <span class="sub">（${escapeHtml(it.time)}）</span></span></summary>
+        <ol>${it.steps.map(st=>`<li>${escapeHtml(st)}</li>`).join('')}</ol></details>`;
+    });
+    h += `</div>`;
+  });
+  return h;
+}
+
 function render(opts){
   if(!(opts && opts.skipCapture)) capturePendingInputs(opts);
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('sel', b.dataset.tab===state.tab));
@@ -508,6 +661,7 @@ function render(opts){
   if(state.tab==='home') app.innerHTML = renderHome();
   else if(state.tab==='history') app.innerHTML = renderHistory();
   else if(state.tab==='trends') app.innerHTML = renderTrends();
+  else if(state.tab==='stretch') app.innerHTML = renderStretch();
   else app.innerHTML = renderSettings();
   refreshExerciseDatalist();
   bindEvents();
@@ -3524,6 +3678,8 @@ function shiftMonth(ym, delta){
 autoImportHamrehabBike();
 migrateLegTarget();
 loadDraft();
+// デイリーホームの「🧘 ストレッチ」リンク（#stretch）からはストレッチのタブで開く
+try{ if(location.hash === '#stretch') state.tab = 'stretch'; }catch(e){}
 render({ skipCapture: true });
 </script>
 </body>
