@@ -492,9 +492,9 @@ test('脚の目標は10〜12。旧初期値(12〜20)で保存済みなら起動�
   assert.deepEqual(norm(back.getVolumeTargets()['脚']), [12,20]);
 });
 
-test('buildPrompt() はmustを曜日の必須（水曜5・ほか4）、optionalを上半身1〜2にする', () => {
+test('buildPrompt() はmustを曜日の必須（火・水5・金土4）、optionalを上半身1〜2にする', () => {
   const p = app().buildPrompt('1', 'none', null, 0);
-  assert.match(p, /must_exercises: 【このジムの曜日別メニュー】の次回の曜日の「必須」（水曜は5種目、ほかは4種目/);
+  assert.match(p, /must_exercises: 【このジムの曜日別メニュー】の次回の曜日の「必須」（火・水曜は5種目、金・土は4種目/);
   assert.match(p, /optional_exercises: 上半身の提案1〜2種目（ジムの脚トレは休止中なので脚種目は入れない）/);
   assert.doesNotMatch(p, /合計8種目ちょうど/);
   assert.doesNotMatch(p, /2種目ともmust_exercises/);
@@ -548,7 +548,7 @@ test('buildPrompt() は選んだジムの曜日別メニューを渡し、志村
   assert.match(shimura, /■金（肩）\n  必須（この順で固定）: 1\. ショルダープレス（志村マシン）/);
   assert.match(shimura, /■土（胸と背中）\n  必須（この順で固定）: 1\. マシンチェストプレス \/ 2\. マシンインクラインプレス \/ 3\. チンニング（縦グリップ）/);
   assert.match(shimura, /ケーブルマシンは使えません/);
-  assert.match(shimura, /must_exercisesは、次回（火）の「必須」4種目を上の順番/);
+  assert.match(shimura, /must_exercisesは、次回（火）の「必須」5種目を上の順番/);
   const hongo = loadApp({ today:'2026-10-20T20:00:00+09:00' }).buildPrompt('2', 'none', null, 0);   // 火 → 次は水
   assert.match(hongo, /■水（背中＋二頭）\n  必須（この順で固定）: 1\. チンニング（縦グリップ）/);
   assert.match(hongo, /must_exercisesは、次回（水）の「必須」5種目/);
@@ -556,11 +556,13 @@ test('buildPrompt() は選んだジムの曜日別メニューを渡し、志村
   for (const p of [shimura, hongo]) assert.match(p, /バーベルのベンチプレス・バーベルロウ・デッドリフト/);
 });
 
-test('DAY_MENUS は両店舗とも火・金・土が4種目、水が5種目で、志村にケーブル種目がなく、土曜は火・水と同じ種目', () => {
+test('DAY_MENUS は両店舗とも金・土が4種目、火・水が5種目で、火曜にサイドレイズ、志村にケーブル種目がなく、土曜は火・水と同じ種目', () => {
   const m = app().$('DAY_MENUS');
   for (const g of ['1', '2']) {
-    for (const d of ['tue', 'fri', 'sat']) assert.equal(m[g][d].must.length, 4, `${g} ${d}`);
-    assert.equal(m[g].wed.must.length, 5, `${g} wed`);
+    for (const d of ['fri', 'sat']) assert.equal(m[g][d].must.length, 4, `${g} ${d}`);
+    for (const d of ['tue', 'wed']) assert.equal(m[g][d].must.length, 5, `${g} ${d}`);
+    assert.ok(m[g].tue.must.some(n => /ラテラルレイズ|サイドレイズ/.test(n)), `${g} tue lateral`);
+    assert.ok(!m[g].tue.optional.some(n => /ラテラルレイズ|サイドレイズ/.test(n)), `${g} tue optional`);
     // 土曜の種目は火曜か水曜の種目（志村の縦引きだけはチンニング）
     const earlier = new Set([...m[g].tue.must, ...m[g].wed.must, 'チンニング（縦グリップ）']);
     for (const n of m[g].sat.must) assert.ok(earlier.has(n), `${g} sat ${n}`);
