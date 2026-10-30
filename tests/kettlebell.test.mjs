@@ -26,5 +26,7 @@ test('直近のケトルベルとルールがプロンプトに入る', () => {
   const p = a.buildPrompt('1', 'none', null, 0);
   assert.match(p, /2026-10-26: KBタバタ（15分 \/ ブロックA 16kg）/);
   assert.match(p, /【自宅のケトルベル】/);
-  assert.match(p, /ブルガリアンスクワットにし/);
+  assert.match(p, /月・木以外の週5回/);
+  assert.match(p, /KBタバタは週2回まで（水・日。どちらも翌日が休み）/);
+  assert.match(p, /ランの日はランの後/);
 });
