@@ -731,3 +731,27 @@ test('renderWeekScheduleCard() は月〜日を並べ、月・木は休み、今�
   assert.match(hongo, /1\. チンニング（縦グリップ）/);
   assert.doesNotMatch(hongo, /フロントプル/);
 });
+
+test('今日のメニューはジムをボタンで切り替え、AIの提案と違うジムならそのジムの決まった種目を出す（2026-10-30）', () => {
+  const a = app();
+  const last = { date:'2026-10-29', next_menu:{ gym:'エニタイムフィットネス志村坂上店', category:'肩', focus:'肩', must_exercises:[{ name:'ショルダープレス（志村マシン）', target:'3×10 40kg' }] } };
+  const same = a.renderTodayMenuCard(last, '1', '2026-10-30');
+  assert.match(same, /data-gym="1" class="gym-btn sel">志村坂上/);
+  assert.match(same, /3×10 40kg/);   // AIの提案（重量つき）
+  const other = a.renderTodayMenuCard(last, '2', '2026-10-30');
+  assert.match(other, /data-gym="2" class="gym-btn sel">本郷/);
+  assert.match(other, /AIの提案は志村坂上向けです。本郷の決まった種目を表示しています/);
+  assert.match(other, /金・肩/);
+  assert.match(other, /ダンベルショルダープレス/);
+  assert.doesNotMatch(other, /3×10 40kg/);
+  assert.match(other, /🔁 ダンベルは手のひらをやや内向きに/);   // 入れ替えの条件（ジムごと）
+  // 提案がまだ無いときは、今日（以降）の曜日の決まった種目
+  const none = a.renderTodayMenuCard(null, '1', '2026-11-02');   // 月 → 火
+  assert.match(none, /まだAIの提案がありません/);
+  assert.match(none, /火・胸＋三頭/);
+  assert.match(none, /マシンチェストプレス/);
+  // ジム名が読めない古い提案はそのまま
+  const old = a.renderTodayMenuCard({ date:'2026-09-01', next_menu:{ category:'Push', must_exercises:[{ name:'X', target:'old' }] } }, '2', '2026-10-30');
+  assert.match(old, /old/);
+  assert.equal(a.gymIdOfName('エニタイムフィットネス文京本郷店（本郷三丁目）'), '2');
+});

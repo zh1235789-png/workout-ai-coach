@@ -685,13 +685,7 @@ function renderHome(){
     return renderResult(state.pendingResult, true);
   }
   // 記録は筋トレMEMOで行い、このアプリは前回提案したメニューの表示だけにする
-  let menuHtml = '';
-  const lastStrength = getLastStrengthSession();
-  if(lastStrength && lastStrength.next_menu){
-    menuHtml = renderNextMenu(lastStrength.next_menu, `今日のメニュー（${escapeHtml(lastStrength.date||'')}の提案）`);
-  }else{
-    menuHtml = `<div class="card"><h2>🎯 今日のメニュー</h2><div class="sub">まだ提案がありません。筋トレ後に下の手順でClaudeに送ると、次回のメニューがここに表示されます。</div></div>`;
-  }
+  const menuHtml = renderTodayMenuCard(getLastStrengthSession(), state.selectedGym, todayStr());
 
   let html = menuHtml + renderWeekScheduleCard(state.selectedGym) + `<div class="card">
     <h2>📍 次回行くジム</h2>
@@ -815,9 +809,43 @@ function renderResult(result, isPending){
   return html;
 }
 
-function renderNextMenu(nm, title){
+// ジム名（AIが書いた文字列）→ '1'（志村坂上）/ '2'（本郷）。分からなければ null
+function gymIdOfName(name){
+  const t = String(name||'');
+  return /本郷/.test(t) ? '2' : /志村/.test(t) ? '1' : null;
+}
+function gymToggleHtml(gymId){
+  return `<div class="seg" style="margin-bottom:10px">
+      <button data-gym="1" class="gym-btn${gymId==='1'?' sel':''}">志村坂上</button>
+      <button data-gym="2" class="gym-btn${gymId==='2'?' sel':''}">本郷</button>
+    </div>`;
+}
+// 決まった種目（DAY_MENUS）だけのメニュー。AIの提案が別のジム向けのときや、提案がまだ無いときに出す
+function fixedMenuHtml(gymId, slot){
+  const m = slot && (DAY_MENUS[gymId]||{})[slot.key];
+  if(!m) return `<div class="sub">日曜は振替の日です。行けなかった曜日の種目を、下の週間スケジュールから選んでください。</div>`;
+  return `<span class="ex-max" style="margin-left:0;margin-bottom:6px;display:inline-block">${escapeHtml(slot.label)}・${escapeHtml(slot.focus)}</span>
+    <div class="menu-group-label">🔴 必須</div>${m.must.map(n=>`<div class="menu-ex"><div class="n">${escapeHtml(n)}</div></div>`).join('')}
+    ${m.optional.length ? `<div class="menu-group-label">🟡 余裕があれば</div>${m.optional.map(n=>`<div class="menu-ex"><div class="n">${escapeHtml(n)}</div></div>`).join('')}` : ''}
+    ${DAY_MENUS[gymId].swap ? `<div class="menu-notes">🔁 ${escapeHtml(DAY_MENUS[gymId].swap)}</div>` : ''}`;
+}
+// 今日のメニュー（2026-10-30）。行くジムをボタンで切り替える。AIの提案と同じジムなら提案を、違うジムならそのジムの決まった種目を出す
+function renderTodayMenuCard(lastStrength, gymId, dateStr){
+  const nm = lastStrength && lastStrength.next_menu;
+  const toggle = gymToggleHtml(gymId);
+  if(nm && (gymIdOfName(nm.gym) === null || gymIdOfName(nm.gym) === gymId)){   // ジム名が読めない古い提案はそのまま出す
+    return renderNextMenu(nm, `今日のメニュー（${escapeHtml(lastStrength.date||'')}の提案）`, toggle);
+  }
+  const slot = (nm && WEEK_PLAN.find(p=>p.focus === nm.category)) || nextGymSlot(shiftDate(dateStr, -1));
+  const why = nm
+    ? `AIの提案は${gymIdOfName(nm.gym)==='2' ? '本郷' : '志村坂上'}向けです。${gymId==='2' ? '本郷' : '志村坂上'}の決まった種目を表示しています（重量は前回の記録を参考に）。`
+    : 'まだAIの提案がありません。決まった種目を表示しています。筋トレ後に下の手順でClaudeに送ると、重量つきの提案に変わります。';
+  return `<div class="card"><h2>🎯 今日のメニュー</h2>${toggle}<div class="sub" style="margin-bottom:6px">${escapeHtml(why)}</div>${fixedMenuHtml(gymId, slot)}</div>`;
+}
+
+function renderNextMenu(nm, title, headerHtml){
   let html = '';
-  html += `<div class="card"><h2>🎯 ${title||'次回のトレーニングメニュー'}</h2>`;
+  html += `<div class="card"><h2>🎯 ${title||'次回のトレーニングメニュー'}</h2>${headerHtml||''}`;
   if(nm.gym){ html += `<div class="sub" style="margin-bottom:6px">📍 ${escapeHtml(nm.gym)}</div>`; }
   if(nm.category){ html += `<span class="ex-max" style="margin-left:0;margin-bottom:6px;display:inline-block">${escapeHtml(nm.category)}</span>`; }
   html += `<div class="menu-focus">${escapeHtml(nm.focus||'')}</div>`;
