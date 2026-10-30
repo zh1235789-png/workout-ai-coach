@@ -47,3 +47,34 @@ test('ケトルベルのメニュー選択: その日のおすすめ、複数選
   assert.match(h, /data-kbm="light" class="kbm-btn">軽め</);
   assert.equal(a.cardioDetailLabel({ cardio:'kb', cardioMin:20, kbNote:'【軽め】A\n【上半身】B' }), '（20分 / 【軽め】A　【上半身】B）');
 });
+
+test('ケトルベルは選んだメニューのセット数を0.5倍して部位別セット数に入れ、内訳を出す（2026-10-30）', () => {
+  const sessions = [
+    { id:'g', date:'2026-10-28', exercises:[{ name:'アームカール', sets:[{},{},{}] }] },
+    { id:'k1', type:'cardio', cardio:'kb', date:'2026-10-29', kbMenus:['light'], kbNote:'x' },
+    { id:'k2', type:'cardio', cardio:'kbtabata', date:'2026-10-30', kbMenus:['tabata', 'upper'] },
+    { id:'k3', type:'cardio', cardio:'kb', date:'2026-10-30', kbNote:'手書きだけ' },            // 数えない
+    { id:'r', type:'cardio', cardio:'run', date:'2026-10-30', kbMenus:['heavy'] },               // ケトルベル以外は数えない
+    { id:'old', type:'cardio', cardio:'kb', date:'2026-10-10', kbMenus:['heavy'] },             // 範囲外
+  ];
+  const a = loadApp({ today:'2026-10-30T20:00:00+09:00', storage:{ wac_sessions: JSON.stringify(sessions) } });
+  assert.deepEqual(norm(a.kbVolumeOf(sessions[1])), { 脚:3 });
+  assert.deepEqual(norm(a.kbVolumeOf(sessions[2])), { 脚:2, 二頭筋:1.5, 三頭筋:1.5, 肩:1.5 });
+  const v = a.weeklyVolume(0, 'rolling');
+  assert.equal(v.kbCount, 2);
+  assert.equal(v.sessionCount, 1);
+  assert.equal(norm(v.byPart)['脚'], 5);
+  assert.equal(norm(v.byPart)['二頭筋'], 4.5);   // ジム3＋KB1.5
+  assert.deepEqual(norm(v.byPartKb), { 脚:5, 二頭筋:1.5, 三頭筋:1.5, 肩:1.5 });
+  const p = a.buildPrompt('1', 'none', null, 0);
+  assert.match(p, /（うちケトルベル2回分: 肩1\.5 二頭筋1\.5 三頭筋1\.5 脚5）/);
+  assert.match(p, /記録で選んだメニューのセット数を0\.5倍して/);
+  const card = a.renderWeeklyVolumeCard();
+  assert.match(card, /うちKB5・/);
+  assert.match(card, /自宅のケトルベル（2回）/);
+});
+
+test('ケトルベルだけの週でも部位別セット数をプロンプトに出す', () => {
+  const a = loadApp({ today:'2026-10-30T20:00:00+09:00', storage:{ wac_sessions: JSON.stringify([{ id:'k', type:'cardio', cardio:'kb', date:'2026-10-29', kbMenus:['heavy'] }]) } });
+  assert.match(a.buildPrompt('1', 'none', null, 0), /【部位別セット数/);
+});

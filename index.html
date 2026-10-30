@@ -1900,8 +1900,15 @@ function weeklyVolume(weeksBack, mode){
     to = shiftDate(today, -7*weeksBack);
     from = shiftDate(to, -6);
   }
-  const byPart = {};
-  let sessionCount = 0;
+  const byPart = {}, byPartKb = {};
+  let sessionCount = 0, kbCount = 0;
+  getSessions().forEach(s=>{
+    if(s.type!=='cardio' || !s.date || s.date < from || s.date > to) return;
+    const v = kbVolumeOf(s);
+    if(!Object.keys(v).length) return;
+    kbCount++;
+    Object.entries(v).forEach(([p, n])=>{ byPart[p] = (byPart[p]||0) + n; byPartKb[p] = (byPartKb[p]||0) + n; });
+  });
   sessions.forEach(s=>{
     if(s.date < from || s.date > to) return;
     sessionCount++;
@@ -1914,7 +1921,7 @@ function weeklyVolume(weeksBack, mode){
       secondaryPartsOf(e.name).forEach(sp=>{ byPart[sp] = (byPart[sp]||0) + work*0.5; });
     });
   });
-  return { from, to, byPart, sessionCount };
+  return { from, to, byPart, byPartKb, sessionCount, kbCount };
 }
 
 function weeklyVolumeText(){
@@ -1922,10 +1929,11 @@ function weeklyVolumeText(){
   const parts = BODY_PART_ORDER.filter(p=>p!=='その他');
   const t = getVolumeTargets();
   const fmt = v => parts.map(p=>`${p}${fmtSets(v.byPart[p]||0)}`).join(' ');
-  if(cur.sessionCount === 0 && prev.sessionCount === 0) return '';
+  const kbTxt = v => v.kbCount ? `（うちケトルベル${v.kbCount}回分: ${parts.filter(p=>v.byPartKb[p]).map(p=>`${p}${fmtSets(v.byPartKb[p])}`).join(' ')}）` : '';
+  if(cur.sessionCount === 0 && prev.sessionCount === 0 && !cur.kbCount && !prev.kbCount) return '';
   const goals = parts.map(p=>`${p}${t[p][0]}〜${t[p][1]}`).join(' ');
   const wk = getVolumeRange() === 'week';
-  return `【部位別セット数（${wk ? '暦週' : '7日ごと'}）】\n${wk ? '今週' : '直近7日'}(${cur.from}〜${cur.to}) 筋トレ${cur.sessionCount}回: ${fmt(cur)}\n${wk ? '前週' : 'その前の7日'} 筋トレ${prev.sessionCount}回: ${fmt(prev)}\n週あたりの目標セット数: ${goals}${wk ? '\n※今週はまだ途中の可能性があります。' : ''}\n主働筋を1セット、補助的に使う部位を0.5セットとして数えています（例: ベンチプレス1セット＝胸1・三頭筋0.5・肩0.5）。ウォームアップは含みません。\n目標を下回っている部位があれば、次回メニューでその部位を優先し、評価コメントでも指摘してください。減量中は下限付近でも筋量は維持できます。`;
+  return `【部位別セット数（${wk ? '暦週' : '7日ごと'}）】\n${wk ? '今週' : '直近7日'}(${cur.from}〜${cur.to}) 筋トレ${cur.sessionCount}回: ${fmt(cur)}${kbTxt(cur)}\n${wk ? '前週' : 'その前の7日'} 筋トレ${prev.sessionCount}回: ${fmt(prev)}${kbTxt(prev)}\n週あたりの目標セット数: ${goals}${wk ? '\n※今週はまだ途中の可能性があります。' : ''}\n主働筋を1セット、補助的に使う部位を0.5セットとして数えています（例: ベンチプレス1セット＝胸1・三頭筋0.5・肩0.5）。ウォームアップは含みません。自宅のケトルベルは、記録で選んだメニューのセット数を0.5倍して加えています（16kgは限界まで追い込みにくいため）。\n目標を下回っている部位があれば、次回メニューでその部位を優先し、評価コメントでも指摘してください。減量中は下限付近でも筋量は維持できます。`;
 }
 
 function renderWeeklyVolumeCard(){
@@ -1938,12 +1946,13 @@ function renderWeeklyVolumeCard(){
   let rows = parts.map(p=>{
     const v = cur.byPart[p] || 0;
     const pv = prev.byPart[p] || 0;
+    const kv = (cur.byPartKb||{})[p] || 0;
     const cls = volumeClass(p, v, t);
     const [lo, hi] = t[p];
     return `<div class="vol-row">
       <span class="vol-part">${p}</span>
       <span class="vol-bar"><span class="vol-fill${cls}" style="width:${Math.min(100, v/maxVal*100)}%"></span><span class="vol-goal" style="left:${Math.min(100, lo/maxVal*100)}%"></span></span>
-      <span class="vol-num${cls}">${fmtSets(v)}<span class="vol-prev">/${lo}〜${hi}（${wk ? '前週' : '前7日'}${fmtSets(pv)}）</span></span>
+      <span class="vol-num${cls}">${fmtSets(v)}<span class="vol-prev">/${lo}〜${hi}（${kv ? `うちKB${fmtSets(kv)}・` : ''}${wk ? '前週' : '前7日'}${fmtSets(pv)}）</span></span>
     </div>`;
   }).join('');
   const md = d => d.slice(5).replace('-','/');
@@ -1953,7 +1962,7 @@ function renderWeeklyVolumeCard(){
       <button class="vol-range${wk ? '' : ' sel'}" data-range="rolling">直近7日</button>
       <button class="vol-range${wk ? ' sel' : ''}" data-range="week">今週（日〜土）</button>
     </div>
-    <div class="sub" style="margin-bottom:10px">${md(cur.from)}〜${md(cur.to)} / 筋トレ${cur.sessionCount}回。主働筋を<b>1セット</b>、補助的に使う部位を<b>0.5セット</b>として数えます（ベンチプレス1セット＝胸1・三頭筋0.5・肩0.5）。ウォームアップは除外。目標は設定タブで変えられます。</div>
+    <div class="sub" style="margin-bottom:10px">${md(cur.from)}〜${md(cur.to)} / 筋トレ${cur.sessionCount}回。主働筋を<b>1セット</b>、補助的に使う部位を<b>0.5セット</b>として数えます（ベンチプレス1セット＝胸1・三頭筋0.5・肩0.5）。ウォームアップは除外。自宅のケトルベル（${cur.kbCount}回）は、記録で選んだメニューのセット数を<b>0.5倍</b>して加えています。目標は設定タブで変えられます。</div>
     ${rows}
     <div class="vol-legend"><span class="dot vol-dot-low"></span>目標未満　<span class="dot vol-dot-good"></span>目標の範囲内　<span class="dot vol-dot-over"></span>上限超</div>
   </div>`;
@@ -2804,6 +2813,7 @@ function bindEvents(){
         cardioKm: (state.cardio==='bike' || state.cardio==='bike3015' || isKb(state.cardio)) ? null : numOrNull(state.cardioKm)
       };
       if(isKb(state.cardio) && (state.kbNote||'').trim()) entry.kbNote = state.kbNote.trim();
+      if(isKb(state.cardio) && Array.isArray(state.kbMenus) && state.kbMenus.length) entry.kbMenus = state.kbMenus.filter(k=>KB_MENUS[k]);
       if(state.cardio==='bike') entry.bike = JSON.parse(JSON.stringify(state.bikeDraft));
       if(state.cardio==='bike3015') entry.b3015 = JSON.parse(JSON.stringify(state.b3015Draft));
       sessions.push(entry);
@@ -3408,11 +3418,24 @@ const WEEK_PLAN = [
 ];
 // 自宅ケトルベル（16kg）のメニュー（2026-10-30）。WEEK_PLAN の kbLevel / kbUpper から引く。デイリーホームも読む
 const KB_MENUS = {
-  light: { label:'軽め（火・金・土）', items:['かかと上げゴブレットスクワット 3×8〜10（3秒で下ろす）', '片脚RDL 左右3×8'] },
-  heavy: { label:'しっかり（水・日）', items:['両手スイング 1分ごとに10回×10分', 'ゴブレット・ブルガリアンスクワット 左右3×8〜10', 'RDL 3×10'] },
-  tabata: { label:'タバタ（水・日、週2回まで）', items:['20秒動く／10秒休む×8本。スイングとゴブレットスクワットを交互に（その日のスイングと置き換え）'] },
-  upper: { label:'上半身（日曜）', items:['ハンマーカール 3×10〜12', 'オーバーヘッドエクステンション 3×10〜12', 'リアデルトロウ 左右3×12〜15'] },
+  light: { label:'軽め（火・金・土）', sets:{ 脚:6 }, items:['かかと上げゴブレットスクワット 3×8〜10（3秒で下ろす）', '片脚RDL 左右3×8'] },
+  heavy: { label:'しっかり（水・日）', sets:{ 脚:11 }, items:['両手スイング 1分ごとに10回×10分', 'ゴブレット・ブルガリアンスクワット 左右3×8〜10', 'RDL 3×10'] },
+  tabata: { label:'タバタ（水・日、週2回まで）', sets:{ 脚:4 }, items:['20秒動く／10秒休む×8本。スイングとゴブレットスクワットを交互に（その日のスイングと置き換え）'] },
+  upper: { label:'上半身（日曜）', sets:{ 二頭筋:3, 三頭筋:3, 肩:3 }, items:['ハンマーカール 3×10〜12', 'オーバーヘッドエクステンション 3×10〜12', 'リアデルトロウ 左右3×12〜15'] },
 };
+// 部位別セット数に入れるときの重み（2026-10-30 ユーザー決定）。16kgはジムほど限界近くまで追い込めないので半分で数える。
+// sets はメニューの種目のセット数（スイング10分≒5セット、タバタ8本≒4セット）。記録で選んだメニュー（kbMenus）だけを数え、手書きの内容は数えない
+const KB_VOLUME_WEIGHT = 0.5;
+function kbVolumeOf(session){
+  const out = {};
+  if(!isKb(session.cardio) || !Array.isArray(session.kbMenus)) return out;
+  session.kbMenus.forEach(k=>{
+    const m = KB_MENUS[k];
+    if(!m || !m.sets) return;
+    Object.entries(m.sets).forEach(([p, n])=>{ out[p] = (out[p]||0) + n*KB_VOLUME_WEIGHT; });
+  });
+  return out;
+}
 // 記録画面のケトルベルのメニュー選択（2026-10-30）。その日の予定に合うものを「おすすめ」にする（純粋関数）
 function kbRecommend(dateStr, kind){
   const [y,m,d] = dateStr.split('-').map(Number);
@@ -3683,7 +3706,7 @@ ${workoutText ? '' : '写真から読み取れるのは今日の分だけです�
 - 強さは【週の予定】のとおり: 火・金・土=軽め（スイングなし）、水・日=しっかり（スイング中心）。KBタバタは週2回まで（水・日。どちらも翌日が休み）
 ${Object.values(KB_MENUS).map(m=>`  ・${m.label}: ${m.items.join(' / ')}`).join('\n')}
 - ランの日はランの後（できれば朝ラン→夕方以降）に行う。ラン前にやるとハムが疲れた状態で走ることになる
-- ケトルベルの回数は上の【部位別セット数】に入っていません
+- ケトルベルは、記録で選んだメニューのセット数を0.5倍して上の【部位別セット数】に入れています（内訳も書いてあります）。手書きの内容だけの記録は入っていません
 - 直近7日にKBタバタが3回以上、または火曜（翌日ロング走）にスイングやタバタがあれば、notesで割り振りを戻すよう一言添えてください
 
 【次回トレーニングを行うジム】${gymName}
