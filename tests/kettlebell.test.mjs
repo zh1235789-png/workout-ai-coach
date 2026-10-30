@@ -2,7 +2,7 @@
 // 内容メモが一覧・プロンプトに出ること、脚トレの判断にプロンプトで使われることを確かめる。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadApp } from './harness.mjs';
+import { loadApp, norm } from './harness.mjs';
 
 const TODAY = '2026-10-28T09:00:00+09:00';
 const kb = (date, cardio, kbNote) => ({ id: 'k-' + date + cardio, type: 'cardio', date, cardio, pain: 0, cardioMin: 15, cardioKm: null, kbNote });
@@ -29,4 +29,21 @@ test('直近のケトルベルとルールがプロンプトに入る', () => {
   assert.match(p, /月・木以外の週5回/);
   assert.match(p, /KBタバタは週2回まで（水・日。どちらも翌日が休み）/);
   assert.match(p, /ランの日はランの後/);
+});
+
+test('ケトルベルのメニュー選択: その日のおすすめ、複数選択で内容欄を作る、改行は1行に（2026-10-30）', () => {
+  const a = app([]);
+  assert.deepEqual(norm(a.kbRecommend('2026-11-03', 'kb')), ['light']);            // 火
+  assert.deepEqual(norm(a.kbRecommend('2026-11-04', 'kb')), ['heavy']);            // 水
+  assert.deepEqual(norm(a.kbRecommend('2026-11-08', 'kb')), ['heavy', 'upper']);   // 日
+  assert.deepEqual(norm(a.kbRecommend('2026-11-08', 'kbtabata')), ['tabata', 'upper']);
+  assert.deepEqual(norm(a.kbRecommend('2026-11-02', 'kb')), []);                   // 月（休み）
+  const note = a.kbNoteFromMenus(['upper', 'light']);   // 並びは KB_MENUS の順
+  assert.equal(note.split('\n').length, 2);
+  assert.match(note, /^【軽め】かかと上げゴブレットスクワット 3×8〜10（3秒で下ろす）／片脚RDL 左右3×8\n【上半身】ハンマーカール/);
+  const h = a.renderKbMenuPicker('2026-11-08', 'kb', ['heavy']);
+  assert.match(h, /data-kbm="heavy" class="kbm-btn sel">しっかり ★/);
+  assert.match(h, /data-kbm="upper" class="kbm-btn">上半身 ★/);
+  assert.match(h, /data-kbm="light" class="kbm-btn">軽め</);
+  assert.equal(a.cardioDetailLabel({ cardio:'kb', cardioMin:20, kbNote:'【軽め】A\n【上半身】B' }), '（20分 / 【軽め】A　【上半身】B）');
 });

@@ -335,7 +335,7 @@ const DEFAULT_EQUIP_2 = `【マシン種目(PRECOR製)】チェストプレス�
 【保有器具】パワーラック(3台)、スミスマシン、ケーブルマシン、ダンベル、ベンチ、ストレッチエリア、体組成計
 【有酸素(PRECOR製)】トレッドミル(8台)、クロストレーナー(2台)、リカンベントバイク(2台)、アップライトバイク(2台)`;
 
-let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, bikeDraft: null, b3015Draft: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null, pickerTarget: null, pain: null, trendEx: null, cardioMin: null, cardioKm: null, kbNote: null, filterDate: null, pasteText: null };
+let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, bikeDraft: null, b3015Draft: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null, pickerTarget: null, pain: null, trendEx: null, cardioMin: null, cardioKm: null, kbNote: null, kbMenus: [], filterDate: null, pasteText: null };
 
 function getSessions(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_SESSIONS)||'[]'); }catch(e){ return []; } }
 function saveSessions(list){ localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list)); }
@@ -353,7 +353,7 @@ function switchTab(tab){
 
 /* ===== 記録途中の下書き（タブ切替・アプリ終了でも残す） ===== */
 const LS_KEY_DRAFT = 'wac_draft';
-const DRAFT_KEYS = ['entryRows','entryRowsFromMenu','cardio','bikeDraft','b3015Draft','cardioMin','cardioKm','kbNote','pain','pasteText','pendingResult'];
+const DRAFT_KEYS = ['entryRows','entryRowsFromMenu','cardio','bikeDraft','b3015Draft','cardioMin','cardioKm','kbNote','kbMenus','pain','pasteText','pendingResult'];
 
 function saveDraft(){
   try{
@@ -720,7 +720,8 @@ function renderHome(){
       <input type="number" id="cardioMin" placeholder="時間（分）" inputmode="numeric" value="${escapeAttr(state.cardioMin||'')}">
       ${(state.cardio==='bike' || state.cardio==='bike3015' || isKb(state.cardio)) ? '' : `<input type="number" id="cardioKm" placeholder="距離（km）" inputmode="decimal" step="0.1" value="${escapeAttr(state.cardioKm||'')}">`}
     </div>
-    ${isKb(state.cardio) ? `<input type="text" id="kbNote" style="margin-top:8px;width:100%" placeholder="内容（例: スイング15回×5 16kg／片脚RDL 8×3）" value="${escapeAttr(state.kbNote||'')}">
+    ${isKb(state.cardio) ? `${renderKbMenuPicker(state.cardioLogDate || todayStr(), state.cardio, state.kbMenus)}
+    <textarea id="kbNote" rows="3" style="margin-top:8px;width:100%" placeholder="内容（メニューを選ぶと入ります。回数や重さはここで直せます）">${escapeHtml(state.kbNote||'')}</textarea>
     <div class="sub" style="margin-top:4px">火・金・土は軽め（スイングなし）、水・日はしっかり（タバタは週2回まで）。ランの日はランの後に。翌朝のハムの張りも確認。</div>` : ''}
     <div class="field" style="margin-top:10px;margin-bottom:0">
       <label>日付</label>
@@ -1259,7 +1260,7 @@ function cardioDetailLabel(s){
   if(s.cardio === 'bike3015' && s.b3015){ const b = b3015SummaryLabel(s.b3015); if(b) parts.push(b); }
   if(s.cardioMin != null) parts.push(`${s.cardioMin}分`);
   if(s.cardioKm != null) parts.push(`${s.cardioKm}km`);
-  if(s.kbNote) parts.push(s.kbNote);
+  if(s.kbNote) parts.push(String(s.kbNote).replace(/\s*\n\s*/g, '　'));
   return parts.length ? `（${parts.join(' / ')}）` : '';
 }
 
@@ -2724,6 +2725,16 @@ function bindEvents(){
   if(cardioKm) cardioKm.oninput = ()=>{ state.cardioKm = cardioKm.value; };
   const kbNoteEl = document.getElementById('kbNote');
   if(kbNoteEl) kbNoteEl.oninput = ()=>{ state.kbNote = kbNoteEl.value; };
+  document.querySelectorAll('.kbm-btn').forEach(b=>{
+    b.onclick = ()=>{
+      capturePendingInputs();   // ほかの入力を退避してから、内容欄だけ選んだメニューで作り直す
+      const cur = Array.isArray(state.kbMenus) ? state.kbMenus : [];
+      const k = b.dataset.kbm;
+      state.kbMenus = cur.includes(k) ? cur.filter(x=>x!==k) : cur.concat([k]);
+      state.kbNote = kbNoteFromMenus(state.kbMenus);
+      render({ skipCapture: true });
+    };
+  });
 
   const inputCardioDate = document.getElementById('inputCardioDate');
   if(inputCardioDate) inputCardioDate.onchange = ()=>{ state.cardioLogDate = inputCardioDate.value; render(); };
@@ -2773,7 +2784,7 @@ function bindEvents(){
       // 続けて押しても二重に登録されないよう、有酸素の入力だけリセットする
       // （筋トレの入力を退避してから、有酸素だけを消して再描画する）
       capturePendingInputs();
-      state.cardio = 'none'; state.cardioMin = null; state.cardioKm = null; state.kbNote = null; state.bikeDraft = null; state.b3015Draft = null;
+      state.cardio = 'none'; state.cardioMin = null; state.cardioKm = null; state.kbNote = null; state.kbMenus = []; state.bikeDraft = null; state.b3015Draft = null;
       state.error = null; state.cardioError = null;
       render({ skipCapture: true });
       const msg = document.getElementById('cardioLogSaved');
@@ -3374,6 +3385,26 @@ const KB_MENUS = {
   tabata: { label:'タバタ（水・日、週2回まで）', items:['20秒動く／10秒休む×8本。スイングとゴブレットスクワットを交互に（その日のスイングと置き換え）'] },
   upper: { label:'上半身（日曜）', items:['ハンマーカール 3×10〜12', 'オーバーヘッドエクステンション 3×10〜12', 'リアデルトロウ 左右3×12〜15'] },
 };
+// 記録画面のケトルベルのメニュー選択（2026-10-30）。その日の予定に合うものを「おすすめ」にする（純粋関数）
+function kbRecommend(dateStr, kind){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const slot = WEEK_PLAN.find(p=>p.days.includes(new Date(y, m-1, d).getDay()));
+  if(!slot || !slot.kbLevel) return [];
+  const keys = kind === 'kbtabata' ? ['tabata'] : [slot.kbLevel];
+  if(slot.kbUpper) keys.push('upper');
+  return keys;
+}
+function kbShortLabel(key){ return (KB_MENUS[key] ? KB_MENUS[key].label : key).replace(/（.*$/, ''); }
+function kbNoteFromMenus(keys){
+  return Object.keys(KB_MENUS).filter(k=>(keys||[]).includes(k))
+    .map(k=>`【${kbShortLabel(k)}】${KB_MENUS[k].items.join('／')}`).join('\n');
+}
+function renderKbMenuPicker(dateStr, kind, selected){
+  const rec = kbRecommend(dateStr, kind);
+  const btns = Object.keys(KB_MENUS).map(k=>
+    `<button data-kbm="${k}" class="kbm-btn${(selected||[]).includes(k) ? ' sel' : ''}">${escapeHtml(kbShortLabel(k))}${rec.includes(k) ? ' ★' : ''}</button>`).join('');
+  return `<div class="sub" style="margin-top:10px;margin-bottom:4px">メニューを選ぶ（★はこの日のおすすめ。複数選べます）</div><div class="seg wrap">${btns}</div>`;
+}
 // 筋トレは週4回が目標（2026-10-30）。月曜〜その日までに筋トレした日数
 const WEEKLY_GYM_TARGET = 4;
 function gymCountThisWeek(dateStr){
