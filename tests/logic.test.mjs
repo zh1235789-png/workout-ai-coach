@@ -636,9 +636,9 @@ test('buildPrompt() は曜日で部位を指定し、脚はどの曜日も入れ
   assert.match(tue, /次回の筋トレは「水（背中＋二頭）」の予定です。次回メニューの脚は入れないでください（ジムの脚トレは休止中/);
   assert.match(tue, /next_menu.categoryには「背中＋二頭」/);
   assert.match(tue, /- 火: 胸＋三頭 \/ ラン=朝ラン（Greg 5K。イージーかスピード練習） \/ ジムの脚=なし \/ 自宅ケトルベル=軽め（かかと上げゴブレットスクワット＋片脚RDL。スイングなし）/);
-  assert.match(tue, /・しっかり（水・日）: 両手スイング 1分ごとに10回×10分 \/ ゴブレット・ブルガリアンスクワット 左右3×8〜10 \/ RDL 3×10/);
+  assert.match(tue, /・しっかり（水・日）: 両手スイング 1分ごとに10回×5分 \/ 片手スナッチ 1分ごとに左右5回×5分（手首が痛む日は両手スイングに戻す） \/ ゴブレット・ブルガリアンスクワット 左右3×8〜10 \/ RDL 3×10/);
   assert.match(tue, /・上半身（日曜）: ハンマーカール/);
-  assert.match(tue, /- 水: 背中＋二頭 \/ ラン=ロング走（朝） \/ ジムの脚=なし \/ 自宅ケトルベル=しっかり（スイング中心。KBタバタ可）/);
+  assert.match(tue, /- 水: 背中＋二頭 \/ ラン=ロング走（朝） \/ ジムの脚=なし \/ 自宅ケトルベル=しっかり（スイング＋スナッチ。KBタバタ可）/);
   assert.match(tue, /- 土: 胸と背中 \/ ラン=なし（第1・3・5土曜は朝から仕事。第2・4土曜は任意で軽いジョグ/);
   for (const [day, next] of [['2026-10-23','土（胸と背中）'], ['2026-10-21','金（肩）'], ['2026-10-25','火（胸＋三頭）']]) {
     const p = loadApp({ today: day + 'T20:00:00+09:00' }).buildPrompt('1', 'none', null, 0);
@@ -715,16 +715,16 @@ test('週間の表はラン・筋トレ・ケトルベルを月〜日で並べ�
 
 // ===== 週間スケジュールのカード（2026-10-21） =====
 
-test('renderWeekScheduleCard() は月〜日を並べ、月・木は休み、今日と次回を示し、選んだジムの種目を出す', () => {
+test('renderWeekScheduleCard() は月〜日を並べ、月・木はジムなし、今日と次回を示し、選んだジムの種目を出す', () => {
   const a = app();
   const h = a.renderWeekScheduleCard('1', '2026-10-21');   // 水
   const days = [...h.matchAll(/<div class="wk-day">(.)<\/div>/g)].map(m => m[1]).join('');
   assert.equal(days, '月火水木金土日');
-  assert.equal((h.match(/休み（手術日）/g) || []).length, 2);
+  assert.equal((h.match(/ジムなし（手術日）/g) || []).length, 2);
   assert.match(h, /class="wk-row today"><div class="wk-day">水/);
   assert.match(h, /肩・脚なし<span class="wk-tag">次回<\/span>/);
   assert.match(h, /次回は金曜：肩・脚なし（志村坂上の種目）/);
-  assert.match(h, /🔔 ケトルベル: しっかり（スイング中心。KBタバタ可）/);
+  assert.match(h, /🔔 ケトルベル: しっかり（スイング＋スナッチ。KBタバタ可）/);
   assert.match(h, /1\. フロントプル/);
   assert.match(h, /バイク4×4（筋トレをする日は筋トレ前/);
   const hongo = a.renderWeekScheduleCard('2', '2026-10-21');

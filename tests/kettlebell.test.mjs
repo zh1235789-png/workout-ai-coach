@@ -26,8 +26,10 @@ test('直近のケトルベルとルールがプロンプトに入る', () => {
   const p = a.buildPrompt('1', 'none', null, 0);
   assert.match(p, /2026-10-26: KBタバタ（15分 \/ ブロックA 16kg）/);
   assert.match(p, /【自宅のケトルベル】/);
-  assert.match(p, /月・木以外の週5回/);
-  assert.match(p, /KBタバタは週2回まで（水・日。どちらも翌日が休み）/);
+  assert.match(p, /週7回やります/);
+  assert.match(p, /月・木=朝に体幹・瞬発/);
+  assert.match(p, /スナッチで手首が痛む日は両手スイングに戻す/);
+  assert.match(p, /KBタバタは週2回まで（水・日。どちらも翌日はジムなし）/);
   assert.match(p, /ランの日はランの後/);
 });
 
@@ -37,7 +39,9 @@ test('ケトルベルのメニュー選択: その日のおすすめ、複数選
   assert.deepEqual(norm(a.kbRecommend('2026-11-04', 'kb')), ['heavy']);            // 水
   assert.deepEqual(norm(a.kbRecommend('2026-11-08', 'kb')), ['heavy', 'upper']);   // 日
   assert.deepEqual(norm(a.kbRecommend('2026-11-08', 'kbtabata')), ['tabata', 'upper']);
-  assert.deepEqual(norm(a.kbRecommend('2026-11-02', 'kb')), []);                   // 月（休み）
+  assert.deepEqual(norm(a.kbRecommend('2026-11-02', 'kb')), ['core']);             // 月（手術日・朝の体幹）
+  assert.deepEqual(norm(a.kbRecommend('2026-11-05', 'kb')), ['core']);             // 木
+  assert.deepEqual(norm(a.kbRecommend('2026-11-02', 'kbtabata')), []);             // タバタは水・日だけ
   const note = a.kbNoteFromMenus(['upper', 'light']);   // 並びは KB_MENUS の順
   assert.equal(note.split('\n').length, 2);
   assert.match(note, /^【軽め】かかと上げゴブレットスクワット 3×8〜10（3秒で下ろす）／片脚RDL 左右3×8\n【上半身】ハンマーカール/);
@@ -77,4 +81,22 @@ test('ケトルベルは選んだメニューのセット数を0.5倍して部�
 test('ケトルベルだけの週でも部位別セット数をプロンプトに出す', () => {
   const a = loadApp({ today:'2026-10-30T20:00:00+09:00', storage:{ wac_sessions: JSON.stringify([{ id:'k', type:'cardio', cardio:'kb', date:'2026-10-29', kbMenus:['heavy'] }]) } });
   assert.match(a.buildPrompt('1', 'none', null, 0), /【部位別セット数/);
+});
+
+test('月・木は朝の体幹・瞬発メニュー。ジムの枠には数えない（2026-11-01）', () => {
+  const a = app([]);
+  assert.deepEqual(norm(a.kbVolumeOf({ cardio:'kb', kbMenus:['core'] })), { 脚:4.5, 体幹:2, 僧帽筋:1.5 });
+  assert.equal(a.nextGymSlot('2026-11-02').key, 'tue');      // 月の次の筋トレは火
+  assert.equal(a.nextGymSlot('2026-11-04').key, 'fri');      // 水の次は木を飛ばして金
+  const t = a.weekTableHtml('2026-11-02');
+  assert.match(t, /<tr class="today"><td>月<\/td><td class="off">朝ウォーキング<\/td><td class="off">オフ（手術日）<\/td><td>体幹・瞬発（朝）<\/td><\/tr>/);
+  const card = a.renderWeekScheduleCard('1', '2026-11-02');
+  assert.match(card, /ジムなし（手術日）。朝ウォーキング20〜30分＋🔔 体幹・瞬発（朝）/);
+  assert.match(card, /体幹・瞬発（月・木の朝）/);
+  assert.match(card, /片手スナッチ 1分ごとに左右5回×5分/);
+  const p = a.buildPrompt('1', 'none', null, 0);
+  assert.match(p, /月・木は仕事（手術日）でジム・ランなし。朝にウォーキング＋自宅ケトルベル=体幹・瞬発/);
+  assert.match(p, /体幹・瞬発（月・木の朝）: 片手ハイプル/);
+  assert.match(p, /体幹タバタ 20秒動く／10秒休む×8本: ハロー→片膝立ちウッドチョップ右→左→プランク・プルスルー/);
+  assert.match(p, /月・木の体幹タバタ（脚を使わない）は「ケトルベル」として記録され/);
 });

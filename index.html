@@ -314,12 +314,12 @@ const LS_KEY_VOL_TARGETS = 'wac_vol_targets';
 const LS_KEY_VOL_RANGE = 'wac_vol_range';
 const LS_KEY_BIKE_UNIT = 'wac_bike_unit';
 const BACKUP_KEYS = [LS_KEY_SESSIONS, LS_KEY_CONDITION, LS_KEY_GYM_EQUIP_1, LS_KEY_GYM_EQUIP_2, LS_KEY_LAST_GYM, LS_KEY_CUSTOM_EX, LS_KEY_BODY, LS_KEY_VOL_TARGETS, LS_KEY_VOL_RANGE, LS_KEY_BIKE_UNIT];
-const DEFAULT_CONDITION = '左ハムストリング肉離れ(2026-07-04受傷)から回復（2026-10-30時点で痛み0）。ジムの脚トレは2026-10-30から休止し、自宅のケトルベル16kgを月・木以外の週5回（タバタは週2回まで）。痛みが出ない範囲で漸進的に。目的は健康維持・筋力向上・体脂肪率の低下。筋トレ週4回が目標(火=胸＋三頭・水=背中＋二頭・金=肩・土=胸と背中。日=行けなかった曜日の振替)、ランニング週3回(Garminコーチ5K・Greg McMillan、2026-11-10開始。火・水ロング走・金。火か金にインターバル走やテンポ走が入る週がある。第2・4土曜は任意で軽いジョグ)、日曜にバイク4×4(余裕がある週は30/15を2〜3セットに替えてもよい。ランにスピード練習があった週は30/15にせず4×4のまま)。月・木は手術日でオフ。';
+const DEFAULT_CONDITION = '左ハムストリング肉離れ(2026-07-04受傷)から回復（2026-10-30時点で痛み0）。ジムの脚トレは2026-10-30から休止し、自宅のケトルベル16kgを週7回（火・金・土=軽め、水・日=しっかり＋スナッチ、月・木=朝に体幹・瞬発メニュー。タバタは週2回まで）。痛みが出ない範囲で漸進的に。目的は健康維持・筋力向上・体脂肪率の低下。筋トレ週4回が目標(火=胸＋三頭・水=背中＋二頭・金=肩・土=胸と背中。日=行けなかった曜日の振替)、ランニング週3回(Garminコーチ5K・Greg McMillan、2026-11-10開始。火・水ロング走・金。火か金にインターバル走やテンポ走が入る週がある。第2・4土曜は任意で軽いジョグ)、日曜にバイク4×4(余裕がある週は30/15を2〜3セットに替えてもよい。ランにスピード練習があった週は30/15にせず4×4のまま)。月・木は手術日でジムなし（朝にウォーキング＋ケトルベルの体幹・瞬発メニュー）。';
 
 const GYM_NAMES = { '1': 'エニタイムフィットネス志村坂上店', '2': 'エニタイムフィットネス文京本郷店（本郷三丁目）' };
 const CARDIO_LABELS = { 'none': 'なし', 'walk': 'ウォーキング', 'run': 'ランニング', 'bike': 'バイク4×4', 'bike3015': 'バイク30/15', 'kb': 'ケトルベル', 'kbtabata': 'KBタバタ' };
 const CARDIO_ICONS = { 'walk': '🚶', 'run': '🏃', 'bike': '🚴', 'bike3015': '🚴', 'kb': '🏋️', 'kbtabata': '🏋️' };
-// 自宅（ベランダ）のケトルベル。2026-10-30から月・木以外の週5回（火・金・土=軽め、水・日=しっかり、タバタ週2まで）。
+// 自宅（ベランダ）のケトルベル。2026-10-30から週5回（火・金・土=軽め、水・日=しっかり、タバタ週2まで）、2026-11-01から月・木の朝に体幹・瞬発を追加。
 const KB_KINDS = ['kb','kbtabata'];
 const isKb = (k)=>KB_KINDS.includes(k);
 function cardioName(kind){ return `${CARDIO_ICONS[kind]||''} ${CARDIO_LABELS[kind]||kind}`; }
@@ -3406,21 +3406,29 @@ const DAY_MENUS = {
 };
 
 // 週の予定（2026-10-20 決定、2026-10-21 曜日別の部位に更新、2026-10-30 筋トレ週4回＋日曜は振替枠・第2/4土曜は任意ジョグ・ジムの脚トレ休止＋自宅ケトルベル週5回）。
-// 月・木は手術日でオフ。ランはGarminコーチ5K（Greg McMillan、2026-11-10開始）で火・水(ロング走)・金。火か金にスピード練習が入る。
+// 月・木は手術日でジムなし（朝にウォーキング＋KB体幹・瞬発＝OFF_DAY_PLAN、2026-11-01〜）。ランはGarminコーチ5K（Greg McMillan、2026-11-10開始）で火・水(ロング走)・金。火か金にスピード練習が入る。
 // ジムの脚トレは 2026-10-30 から休止（12月中旬に見直し。戻すならまず脚Aを1枠）。脚は自宅のケトルベル（16kg）で。
 // kb: 火・金・土=軽め、水・日=しっかり（KBタバタは週2回まで＝水・日。どちらも翌日が休み）。ランの日はランの後に行う。
 const WEEK_PLAN = [
   { days:[2], key:'tue', label:'火', focus:'胸＋三頭', run:'朝ラン（Greg 5K。イージーかスピード練習）', runShort:'Greg 5K', gymShort:'胸＋三頭', kbShort:'軽め', kbLevel:'light', leg:null, kb:'軽め（かかと上げゴブレットスクワット＋片脚RDL。スイングなし）', note:'翌日がロング走なのでケトルベルは軽めにする' },
-  { days:[3], key:'wed', label:'水', focus:'背中＋二頭', run:'ロング走（朝）', runShort:'ロング走', gymShort:'背中＋二頭', kbShort:'しっかり・タバタ可', kbLevel:'heavy', leg:null, kb:'しっかり（スイング中心。KBタバタ可）', note:'ロング走のあと。翌日の木曜は休みなので、ケトルベルはしっかりやってよい' },
+  { days:[3], key:'wed', label:'水', focus:'背中＋二頭', run:'ロング走（朝）', runShort:'ロング走', gymShort:'背中＋二頭', kbShort:'しっかり・タバタ可', kbLevel:'heavy', leg:null, kb:'しっかり（スイング＋スナッチ。KBタバタ可）', note:'ロング走のあと。翌日の木曜はジムもランもない（朝の体幹だけ）ので、ケトルベルはしっかりやってよい' },
   { days:[5], key:'fri', label:'金', focus:'肩', run:'朝ラン（Greg 5K。イージーかスピード練習）', runShort:'Greg 5K', gymShort:'肩', kbShort:'軽め', kbLevel:'light', leg:null, kb:'軽め（かかと上げゴブレットスクワット＋片脚RDL。スイングなし）', note:'朝にインターバル走やテンポ走をした日は、ケトルベルの重さ・回数を増やさない' },
   { days:[6], key:'sat', label:'土', focus:'胸と背中', runShort:'第2・4週だけ軽いジョグ', gymShort:'胸と背中', kbShort:'軽め', kbLevel:'light', run:'なし（第1・3・5土曜は朝から仕事。第2・4土曜は任意で軽いジョグ20〜30分か散歩・Garminコーチ外）', leg:null, kb:'軽め〜ふつう（ジョグの日はその後に）', note:'胸と背中は火・水と同じ種目。仕事のあとで疲れが強い日は余裕枠を削って必須4種目だけにしてよい' },
-  { days:[0], key:'sun', label:'日', focus:'振替（火〜土で行けなかった分）', runShort:'バイク4×4', gymShort:'振替のみ', kbShort:'しっかり・タバタ可＋上半身', kbLevel:'heavy', kbUpper:true, run:'バイク4×4（筋トレをする日は筋トレ前。余裕がある週は30/15に替えてもよいが、ランにスピード練習があった週は4×4のまま）', leg:null, kb:'しっかり（スイング中心。KBタバタ可）＋上半身（腕・肩後部）', note:'筋トレは火・水・金・土の週4回が目標。日曜は行けなかった曜日の分だけ行い、週4回できていれば筋トレは休み（バイクとケトルベルだけ）' },
+  { days:[0], key:'sun', label:'日', focus:'振替（火〜土で行けなかった分）', runShort:'バイク4×4', gymShort:'振替のみ', kbShort:'しっかり・タバタ可＋上半身', kbLevel:'heavy', kbUpper:true, run:'バイク4×4（筋トレをする日は筋トレ前。余裕がある週は30/15に替えてもよいが、ランにスピード練習があった週は4×4のまま）', leg:null, kb:'しっかり（スイング＋スナッチ。KBタバタ可）＋上半身（腕・肩後部）', note:'筋トレは火・水・金・土の週4回が目標。日曜は行けなかった曜日の分だけ行い、週4回できていれば筋トレは休み（バイクとケトルベルだけ）' },
 ];
+// 月・木（手術日）。ジムもランもなく、朝にウォーキング＋ケトルベルの体幹・瞬発メニュー（2026-11-01）。
+// WEEK_PLAN に入れるとジムの枠（次回の筋トレ）として数えられてしまうので別にする。デイリーホームも読む
+const OFF_DAY_PLAN = {
+  days:[1,4], key:'off', label:'月・木', focus:'オフ（手術日）', run:'朝ウォーキング20〜30分', runShort:'朝ウォーキング', gymShort:'オフ（手術日）',
+  kbShort:'体幹・瞬発（朝）', kbLevel:'core', kb:'体幹・瞬発（朝・手術前。ハイプル→脚3種目を3周→体幹タバタ4分）',
+  note:'前日（日・水）にスイングをしっかりやるので、股関節で振る種目はハイプルだけにしてハムを休ませる。手術前なので握力を使い切らない'
+};
 // 自宅ケトルベル（16kg）のメニュー（2026-10-30）。WEEK_PLAN の kbLevel / kbUpper から引く。デイリーホームも読む
 const KB_MENUS = {
   light: { label:'軽め（火・金・土）', sets:{ 脚:6 }, items:['かかと上げゴブレットスクワット 3×8〜10（3秒で下ろす）', '片脚RDL 左右3×8'] },
-  heavy: { label:'しっかり（水・日）', sets:{ 脚:11 }, items:['両手スイング 1分ごとに10回×10分', 'ゴブレット・ブルガリアンスクワット 左右3×8〜10', 'RDL 3×10'] },
+  heavy: { label:'しっかり（水・日）', sets:{ 脚:11 }, items:['両手スイング 1分ごとに10回×5分', '片手スナッチ 1分ごとに左右5回×5分（手首が痛む日は両手スイングに戻す）', 'ゴブレット・ブルガリアンスクワット 左右3×8〜10', 'RDL 3×10'] },
   tabata: { label:'タバタ（水・日、週2回まで）', sets:{ 脚:4 }, items:['20秒動く／10秒休む×8本。スイングとゴブレットスクワットを交互に（その日のスイングと置き換え）'] },
+  core: { label:'体幹・瞬発（月・木の朝）', sets:{ 脚:9, 体幹:4, 僧帽筋:3 }, items:['片手ハイプル 左右5×3（最初に。胸の高さまで素早く引いて止める）', 'ゴブレット・ラテラルランジ 左右6（ここからカーフレイズまで続けて3周）', 'ゴブレット・リバースランジ 左右6', 'ゴブレット片脚カーフレイズ 左右12（段差で）', '体幹タバタ 20秒動く／10秒休む×8本: ハロー→片膝立ちウッドチョップ右→左→プランク・プルスルー（ひじをつく）を2周。脚を使わないので「KBタバタ週2回まで」には数えない（記録は「ケトルベル」で）'] },
   upper: { label:'上半身（日曜）', sets:{ 二頭筋:3, 三頭筋:3, 肩:3 }, items:['ハンマーカール 3×10〜12', 'オーバーヘッドエクステンション 3×10〜12', 'リアデルトロウ 左右3×12〜15'] },
 };
 // 部位別セット数に入れるときの重み（2026-10-30 ユーザー決定）。16kgはジムほど限界近くまで追い込めないので半分で数える。
@@ -3439,12 +3447,15 @@ function kbVolumeOf(session){
 // 記録画面のケトルベルのメニュー選択（2026-10-30）。その日の予定に合うものを「おすすめ」にする（純粋関数）
 function kbRecommend(dateStr, kind){
   const [y,m,d] = dateStr.split('-').map(Number);
-  const slot = WEEK_PLAN.find(p=>p.days.includes(new Date(y, m-1, d).getDay()));
+  const slot = planForDay(new Date(y, m-1, d).getDay());
   if(!slot || !slot.kbLevel) return [];
+  if(slot === OFF_DAY_PLAN && kind === 'kbtabata') return [];   // タバタは水・日だけ
   const keys = kind === 'kbtabata' ? ['tabata'] : [slot.kbLevel];
   if(slot.kbUpper) keys.push('upper');
   return keys;
 }
+// その曜日の予定（ジムの日は WEEK_PLAN、月・木は OFF_DAY_PLAN）
+function planForDay(wd){ return WEEK_PLAN.find(p=>p.days.includes(wd)) || (OFF_DAY_PLAN.days.includes(wd) ? OFF_DAY_PLAN : null); }
 function kbShortLabel(key){ return (KB_MENUS[key] ? KB_MENUS[key].label : key).replace(/（.*$/, ''); }
 function kbNoteFromMenus(keys){
   return Object.keys(KB_MENUS).filter(k=>(keys||[]).includes(k))
@@ -3498,7 +3509,7 @@ function weekPlanText(dateStr){
     : next.leg === '不足時のみ' ? '週の脚のセット数が目標を下回るときだけ、その週にやっていないタイプ（A/B/C）を1種目入れてください'
     : 'タイプ'+next.leg+'にしてください';
   return `【週の予定（曜日ごとの部位と脚のタイプ）】
-月・木は仕事（手術日）で完全オフ。
+月・木は仕事（手術日）でジム・ランなし。朝にウォーキング＋自宅ケトルベル=${OFF_DAY_PLAN.kb}　※${OFF_DAY_PLAN.note}
 ${rows}
 次回の筋トレは「${next.label}（${next.focus}）」の予定です。次回メニューの脚は${legTxt}。${next.note ? next.note+'。' : ''}
 next_menu.categoryには「${next.focus}」と書いてください。notesの冒頭に「次回=${next.label}・${next.focus}・脚${next.leg||'なし'}」と書き、予定と違う曜日に行く場合は上の表のその曜日のメニューに差し替えるよう一言添えてください。
@@ -3533,7 +3544,7 @@ optional_exercisesの上半身は、その曜日の「余裕枠の上半身候�
 `;
 }
 
-// 週間の表（ラン・筋トレ・ケトルベル）。月〜日、月・木は休み（純粋関数）
+// 週間の表（ラン・筋トレ・ケトルベル）。月〜日、月・木はジムなしで朝に体幹（純粋関数）
 function weekTableHtml(dateStr){
   const [y,m,d] = dateStr.split('-').map(Number);
   const wdToday = new Date(y, m-1, d).getDay();
@@ -3544,7 +3555,7 @@ function weekTableHtml(dateStr){
     const cls = wd === wdToday ? ' class="today"' : '';
     rows += slot
       ? `<tr${cls}><td>${label}</td><td>${escapeHtml(slot.runShort||'')}</td><td>${escapeHtml(slot.gymShort||slot.focus)}</td><td>${escapeHtml(slot.kbShort||'')}</td></tr>`
-      : `<tr${cls}><td>${label}</td><td class="off">散歩</td><td class="off">オフ（手術日）</td><td class="off">—</td></tr>`;
+      : `<tr${cls}><td>${label}</td><td class="off">${escapeHtml(OFF_DAY_PLAN.runShort)}</td><td class="off">${escapeHtml(OFF_DAY_PLAN.gymShort)}</td><td>${escapeHtml(OFF_DAY_PLAN.kbShort)}</td></tr>`;
   });
   return `<table class="wt"><thead><tr><th></th><th>🏃 ラン</th><th>🏋️ 筋トレ</th><th>🔔 ケトルベル</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
@@ -3565,7 +3576,7 @@ function renderWeekScheduleCard(gymId, dateStr){
     const slot = WEEK_PLAN.find(p=>p.days.includes(wd));
     const cls = 'wk-row' + (wd === wdToday ? ' today' : '');
     if(!slot){
-      rows += `<div class="${cls}"><div class="wk-day">${label}</div><div class="wk-body wk-off">休み（手術日）</div></div>`;
+      rows += `<div class="${cls}"><div class="wk-day">${label}</div><div class="wk-body wk-off">ジムなし（手術日）。${escapeHtml(OFF_DAY_PLAN.run)}＋🔔 ${escapeHtml(OFF_DAY_PLAN.kbShort)}</div></div>`;
       return;
     }
     const menu = menus[slot.key];
@@ -3702,12 +3713,13 @@ ${workoutText ? '' : '写真から読み取れるのは今日の分だけです�
 ジムの脚トレは休止中なので、ランの日も筋トレは上半身だけです。朝にインターバル走やテンポ走をした日は、その日のケトルベルの重さ・回数を増やさないようnotesで伝えてください。
 
 【自宅のケトルベル】
-ジムとは別に、自宅のベランダで16kgのケトルベルを月・木以外の週5回やります（2026-10-30〜。ジムの脚トレの代わり）。種目はケトルベル・デッドリフト／RDL／片脚RDL／ゴブレットスクワット／両手スイング。「KBタバタ」は20秒動く／10秒休む×8本で、疲れてフォームが崩れやすい分ハムへの負担が大きいものとして扱ってください。記録は上の【直近7日の有酸素運動】に「ケトルベル」「KBタバタ」として入ります（内容のメモ付き）。
-- 強さは【週の予定】のとおり: 火・金・土=軽め（スイングなし）、水・日=しっかり（スイング中心）。KBタバタは週2回まで（水・日。どちらも翌日が休み）
+ジムとは別に、自宅のベランダで16kgのケトルベルを週7回やります（2026-10-30〜。ジムの脚トレの代わり。月・木の朝の体幹・瞬発メニューは2026-11-01〜）。種目はケトルベル・デッドリフト／RDL／片脚RDL／ゴブレットスクワット／両手スイング／片手スナッチ／片手ハイプルと、下のメニューの体幹種目。「KBタバタ」は20秒動く／10秒休む×8本で、疲れてフォームが崩れやすい分ハムへの負担が大きいものとして扱ってください。記録は上の【直近7日の有酸素運動】に「ケトルベル」「KBタバタ」として入ります（内容のメモ付き）。
+- 強さは【週の予定】のとおり: 火・金・土=軽め（スイングなし）、水・日=しっかり（スイング＋スナッチ）、月・木=朝に体幹・瞬発（手術前なので握力を使い切らない。股関節で振る種目はハイプルだけ）。KBタバタは週2回まで（水・日。どちらも翌日はジムなし）
+- 手首を痛めているので、スナッチで手首が痛む日は両手スイングに戻すようnotesで伝えてください
 ${Object.values(KB_MENUS).map(m=>`  ・${m.label}: ${m.items.join(' / ')}`).join('\n')}
 - ランの日はランの後（できれば朝ラン→夕方以降）に行う。ラン前にやるとハムが疲れた状態で走ることになる
 - ケトルベルは、記録で選んだメニューのセット数を0.5倍して上の【部位別セット数】に入れています（内訳も書いてあります）。手書きの内容だけの記録は入っていません
-- 直近7日にKBタバタが3回以上、または火曜（翌日ロング走）にスイングやタバタがあれば、notesで割り振りを戻すよう一言添えてください
+- 月・木の体幹タバタ（脚を使わない）は「ケトルベル」として記録され、KBタバタの回数には入りません。直近7日にKBタバタが3回以上、または火曜（翌日ロング走）にスイングやタバタがあれば、notesで割り振りを戻すよう一言添えてください
 
 【次回トレーニングを行うジム】${gymName}
 【このジムの設備】
