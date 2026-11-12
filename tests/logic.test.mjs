@@ -637,7 +637,7 @@ test('buildPrompt() は曜日で部位を指定し、脚はどの曜日も入れ
   assert.match(tue, /next_menu.categoryには「背中＋二頭」/);
   assert.match(tue, /- 火: 胸＋三頭 \/ ラン=朝ラン（Greg 5K。イージーかスピード練習） \/ ジムの脚=なし \/ 自宅ケトルベル=軽め（かかと上げゴブレットスクワット＋片脚RDL。スイングなし）/);
   assert.match(tue, /・しっかり（水・日）: 両手スイング 1分ごとに10回×5分 \/ 片手スナッチ 1分ごとに左右5回×5分（手首が痛む日は両手スイングに戻す） \/ ゴブレット・ブルガリアンスクワット 左右3×8〜10 \/ RDL 3×10/);
-  assert.match(tue, /・上半身（日曜）: ハンマーカール/);
+  assert.match(tue, /・腕タバタ（金・日の朝）: 20秒動く/);
   assert.match(tue, /- 水: 背中＋二頭 \/ ラン=ロング走（朝） \/ ジムの脚=なし \/ 自宅ケトルベル=しっかり（スイング＋スナッチ。KBタバタ可）/);
   assert.match(tue, /- 土: 胸と背中 \/ ラン=なし（第1・3・5土曜は朝から仕事。第2・4土曜は任意で軽いジョグ/);
   for (const [day, next] of [['2026-10-23','土（胸と背中）'], ['2026-10-21','金（肩）'], ['2026-10-25','火（胸＋三頭）']]) {
@@ -705,7 +705,7 @@ test('週間の表はラン・筋トレ・ケトルベルを月〜日で並べ�
   assert.match(h, /<th>🏃 ラン<\/th><th>🏋️ 筋トレ<\/th><th>🔔 ケトルベル<\/th>/);
   assert.match(h, /<td>火<\/td><td>Greg 5K<\/td><td>胸＋三頭<\/td><td>軽め<\/td>/);
   assert.match(h, /<td>水<\/td><td>ロング走<\/td><td>背中＋二頭<\/td><td>しっかり・タバタ可<\/td>/);
-  assert.match(h, /<tr class="today"><td>日<\/td><td>バイク4×4<\/td><td>振替のみ<\/td><td>しっかり・タバタ可＋上半身<\/td>/);
+  assert.match(h, /<tr class="today"><td>日<\/td><td>バイク4×4<\/td><td>振替のみ<\/td><td>しっかり・タバタ可＋朝に腕タバタ<\/td>/);
   assert.equal((h.match(/オフ（手術日）/g) || []).length, 2);
   const card = a.renderWeekScheduleCard('1', '2026-11-01');
   assert.match(card, /<table class="wt">/);
