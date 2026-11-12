@@ -26,23 +26,27 @@ test('直近のケトルベルとルールがプロンプトに入る', () => {
   const p = a.buildPrompt('1', 'none', null, 0);
   assert.match(p, /2026-10-26: KBタバタ（15分 \/ ブロックA 16kg）/);
   assert.match(p, /【自宅のケトルベル】/);
-  assert.match(p, /週7回やります/);
-  assert.match(p, /月・木=朝に体幹・瞬発/);
+  assert.match(p, /週6回やります/);
+  assert.match(p, /木=朝に体幹・瞬発/);
+  assert.match(p, /月=朝に体幹タバタだけ（脚とハムを休める日）、火=なし（翌日ロング走）/);
   assert.match(p, /スナッチで手首が痛む日は両手スイングに戻す/);
-  assert.match(p, /KBタバタは週2回まで（水・日。どちらも翌日はジムなし）/);
+  assert.match(p, /KBタバタは水曜だけの週1回（日曜はバイク4×4が高強度インターバルなので重ねない）/);
+  assert.match(p, /直近7日にKBタバタが2回以上、日曜にKBタバタ/);
   assert.match(p, /ランの日はランの後/);
 });
 
 test('ケトルベルのメニュー選択: その日のおすすめ、複数選択で内容欄を作る、改行は1行に（2026-10-30）', () => {
   const a = app([]);
-  assert.deepEqual(norm(a.kbRecommend('2026-11-03', 'kb')), ['light']);            // 火
-  assert.deepEqual(norm(a.kbRecommend('2026-11-04', 'kb')), ['heavy']);            // 水
+  assert.deepEqual(norm(a.kbRecommend('2026-11-03', 'kb')), []);                 // 火はなし（翌日ロング走、2026-11-12〜）
+  assert.deepEqual(norm(a.kbRecommend('2026-11-04', 'kb')), ['heavywed']);         // 水はRDLなし
+  assert.deepEqual(norm(a.kbRecommend('2026-11-04', 'kbtabata')), ['tabata']);     // タバタは水だけ
+  assert.deepEqual(norm(a.kbRecommend('2026-11-07', 'kb')), ['light']);            // 土
   assert.deepEqual(norm(a.kbRecommend('2026-11-06', 'kb')), ['light', 'armtabata']);   // 金（朝に腕タバタ）
   assert.deepEqual(norm(a.kbRecommend('2026-11-08', 'kb')), ['heavy', 'armtabata', 'reardelt']);   // 日（上半身の腕2種目は腕タバタに）
-  assert.deepEqual(norm(a.kbRecommend('2026-11-08', 'kbtabata')), ['tabata', 'armtabata', 'reardelt']);
-  assert.deepEqual(norm(a.kbRecommend('2026-11-02', 'kb')), ['core']);             // 月（手術日・朝の体幹）
-  assert.deepEqual(norm(a.kbRecommend('2026-11-05', 'kb')), ['core']);             // 木
-  assert.deepEqual(norm(a.kbRecommend('2026-11-02', 'kbtabata')), []);             // タバタは水・日だけ
+  assert.deepEqual(norm(a.kbRecommend('2026-11-08', 'kbtabata')), []);             // 日はタバタなし（4×4と重ねない）
+  assert.deepEqual(norm(a.kbRecommend('2026-11-02', 'kb')), ['coretabata']);       // 月は体幹タバタだけ
+  assert.deepEqual(norm(a.kbRecommend('2026-11-05', 'kb')), ['core']);             // 木は体幹・瞬発
+  assert.deepEqual(norm(a.kbRecommend('2026-11-02', 'kbtabata')), []);
   const note = a.kbNoteFromMenus(['upper', 'light']);   // 並びは KB_MENUS の順
   assert.equal(note.split('\n').length, 2);
   assert.match(note, /^【軽め】かかと上げゴブレットスクワット 3×8〜10（3秒で下ろす）／片脚RDL 左右3×8\n【上半身】ハンマーカール/);
@@ -66,15 +70,15 @@ test('ケトルベルは選んだメニューのセット数を0.5倍して部�
   ];
   const a = loadApp({ today:'2026-10-30T20:00:00+09:00', storage:{ wac_sessions: JSON.stringify(sessions) } });
   assert.deepEqual(norm(a.kbVolumeOf(sessions[1])), { 脚:3 });
-  assert.deepEqual(norm(a.kbVolumeOf(sessions[2])), { 脚:2, 二頭筋:1.5, 三頭筋:1.5, 肩:1.5 });
+  assert.deepEqual(norm(a.kbVolumeOf(sessions[2])), { 脚:2, 二頭筋:1.5, 三頭筋:1.5, 肩後部:1.5 });
   const v = a.weeklyVolume(0, 'rolling');
   assert.equal(v.kbCount, 2);
   assert.equal(v.sessionCount, 1);
   assert.equal(norm(v.byPart)['脚'], 5);
   assert.equal(norm(v.byPart)['二頭筋'], 4.5);   // ジム3＋KB1.5
-  assert.deepEqual(norm(v.byPartKb), { 脚:5, 二頭筋:1.5, 三頭筋:1.5, 肩:1.5 });
+  assert.deepEqual(norm(v.byPartKb), { 脚:5, 二頭筋:1.5, 三頭筋:1.5, 肩後部:1.5 });
   const p = a.buildPrompt('1', 'none', null, 0);
-  assert.match(p, /（うちケトルベル2回分: 肩1\.5 二頭筋1\.5 三頭筋1\.5 脚5）/);
+  assert.match(p, /（うちケトルベル2回分: 肩後部1\.5 二頭筋1\.5 三頭筋1\.5 脚5）/);
   assert.match(p, /記録で選んだメニューのセット数を0\.5倍して/);
   const card = a.renderWeeklyVolumeCard();
   assert.match(card, /うちKB5・/);
@@ -86,20 +90,28 @@ test('ケトルベルだけの週でも部位別セット数をプロンプト�
   assert.match(a.buildPrompt('1', 'none', null, 0), /【部位別セット数/);
 });
 
-test('月・木は朝の体幹・瞬発メニュー。ジムの枠には数えない（2026-11-01）', () => {
+test('月・木は朝のケトルベル（木=体幹・瞬発、月=体幹タバタだけ）。ジムの枠には数えない（2026-11-01、11-12）', () => {
   const a = app([]);
   assert.deepEqual(norm(a.kbVolumeOf({ cardio:'kb', kbMenus:['core'] })), { 脚:4.5, 体幹:2, 僧帽筋:1.5 });
+  assert.deepEqual(norm(a.kbVolumeOf({ cardio:'kb', kbMenus:['coretabata'] })), { 体幹:2 });
+  assert.deepEqual(norm(a.kbVolumeOf({ cardio:'kb', kbMenus:['heavywed'] })), { 脚:4 });
+  assert.equal(a.offDayPlanFor(1).kbLevel, 'coretabata');
+  assert.equal(a.offDayPlanFor(4).kbLevel, 'core');
+  assert.equal(a.offDayPlanFor(3), null);
   assert.equal(a.nextGymSlot('2026-11-02').key, 'tue');      // 月の次の筋トレは火
   assert.equal(a.nextGymSlot('2026-11-04').key, 'fri');      // 水の次は木を飛ばして金
   const t = a.weekTableHtml('2026-11-02');
-  assert.match(t, /<tr class="today"><td>月<\/td><td class="off">朝ウォーキング<\/td><td class="off">オフ（手術日）<\/td><td>体幹・瞬発（朝）<\/td><\/tr>/);
+  assert.match(t, /<tr class="today"><td>月<\/td><td class="off">朝ウォーキング<\/td><td class="off">オフ（手術日）<\/td><td>体幹タバタ（朝）<\/td><\/tr>/);
+  assert.match(t, /<tr><td>木<\/td><td class="off">朝ウォーキング<\/td><td class="off">オフ（手術日）<\/td><td>体幹・瞬発（朝）<\/td><\/tr>/);
   const card = a.renderWeekScheduleCard('1', '2026-11-02');
+  assert.match(card, /ジムなし（手術日）。朝ウォーキング20〜30分＋🔔 体幹タバタ（朝）/);
   assert.match(card, /ジムなし（手術日）。朝ウォーキング20〜30分＋🔔 体幹・瞬発（朝）/);
-  assert.match(card, /体幹・瞬発（月・木の朝）/);
+  assert.match(card, /体幹・瞬発（木の朝）/);
+  assert.match(card, /体幹タバタ（月の朝）/);
   assert.match(card, /片手スナッチ 1分ごとに左右5回×5分/);
   const p = a.buildPrompt('1', 'none', null, 0);
-  assert.match(p, /月・木は仕事（手術日）でジム・ランなし。朝にウォーキング＋自宅ケトルベル=体幹・瞬発/);
-  assert.match(p, /体幹・瞬発（月・木の朝）: 片手ハイプル/);
+  assert.match(p, /月・木は仕事（手術日）でジム・ランなし。朝にウォーキング＋自宅ケトルベル（月=体幹タバタ4分だけ（朝・手術前）　※前日（日）に.*／木=体幹・瞬発/);
+  assert.match(p, /体幹・瞬発（木の朝）: 片手ハイプル/);
   assert.match(p, /体幹タバタ 20秒動く／10秒休む×8本: ハロー→片膝立ちウッドチョップ右→左→プランク・プルスルー/);
   assert.match(p, /月・木の体幹タバタと腕タバタ（どちらも脚を使わない）は「ケトルベル」として記録され/);
   assert.match(p, /腕タバタ（金・日の朝）: 20秒動く／10秒休む×8本: ハンマーカール（両腕同時）⇄フレンチプレスを交互に4周/);
@@ -108,10 +120,10 @@ test('月・木は朝の体幹・瞬発メニュー。ジムの枠には数え�
 test('腕タバタ（ハンマーカール⇄フレンチプレス）を選べて、二頭・三頭に0.5倍で入る（2026-11-12）', () => {
   const a = app([]);
   assert.deepEqual(norm(a.kbVolumeOf({ cardio:'kb', kbMenus:['armtabata'] })), { 二頭筋:1, 三頭筋:1 });
-  assert.deepEqual(norm(a.kbVolumeOf({ cardio:'kb', kbMenus:['upper', 'armtabata'] })), { 二頭筋:2.5, 三頭筋:2.5, 肩:1.5 });
+  assert.deepEqual(norm(a.kbVolumeOf({ cardio:'kb', kbMenus:['upper', 'armtabata'] })), { 二頭筋:2.5, 三頭筋:2.5, 肩後部:1.5 });
   const h = a.renderKbMenuPicker('2026-11-15', 'kb', ['armtabata']);
   assert.match(h, /data-kbm="armtabata" class="kbm-btn sel">腕タバタ ★</);
-  assert.deepEqual(norm(a.kbRecommend('2026-11-11', 'kb')), ['heavy']);   // 水は午後に二頭をやるのでおすすめしない
+  assert.deepEqual(norm(a.kbRecommend('2026-11-11', 'kb')), ['heavywed']);   // 水は午後に二頭をやるのでおすすめしない
   assert.deepEqual(norm(a.kbRecommend('2026-11-12', 'kb')), ['core']);    // 木の朝は手術前なのでおすすめしない
   assert.match(a.kbNoteFromMenus(['armtabata']), /^【腕タバタ】20秒動く／10秒休む×8本: ハンマーカール（両腕同時）/);
   assert.match(a.renderWeekScheduleCard('1', '2026-11-12'), /🔔 腕タバタ（金・日の朝）/);

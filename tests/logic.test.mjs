@@ -236,7 +236,7 @@ test('BODY_PART_ORDER は腕と背中をまとめず、4つに分けている', 
   const order = norm(app().$('BODY_PART_ORDER'));
   assert.ok(!order.includes('腕'));
   assert.ok(!order.includes('背中'));
-  assert.deepEqual(order, ['胸','広背筋','僧帽筋','肩','二頭筋','三頭筋','脚','体幹','その他']);
+  assert.deepEqual(order, ['胸','広背筋','僧帽筋','肩前部','肩中部','肩後部','二頭筋','三頭筋','脚','体幹','その他']);
 });
 
 test('bodyPartOf() はナローグリップの背中種目を三頭筋にしない', () => {
@@ -259,7 +259,7 @@ test('bodyPartOf() は背中を広背筋と僧帽筋に分ける', () => {
 
 test('secondaryPartsOf() は補助的に使う部位を返す（主働筋は除く）', () => {
   const a = app();
-  assert.deepEqual(norm(a.secondaryPartsOf('ベンチプレス')).sort(), ['三頭筋','肩']);
+  assert.deepEqual(norm(a.secondaryPartsOf('ベンチプレス')).sort(), ['三頭筋','肩前部']);
   assert.deepEqual(norm(a.secondaryPartsOf('ラットプルダウン')), ['二頭筋']);
   assert.deepEqual(norm(a.secondaryPartsOf('シーテッドロウ')).sort(), ['二頭筋','僧帽筋']);
   assert.deepEqual(norm(a.secondaryPartsOf('アームカール')), []);
@@ -274,7 +274,8 @@ test('weeklyVolume() は補助部位を0.5セットとして数える', () => {
   const v = norm(a.weeklyVolume(0).byPart);
   assert.equal(v['胸'], 4);        // 本番4セット（ウォームアップは除外）
   assert.equal(v['三頭筋'], 2);    // 4 × 0.5
-  assert.equal(v['肩'], 2);        // 4 × 0.5
+  assert.equal(v['肩前部'], 2);    // 4 × 0.5
+  assert.equal(v['肩中部'], undefined);
   assert.equal(v['二頭筋'], 3);
 });
 
@@ -307,8 +308,9 @@ test('secondaryPartsOf() は複合種目の意図どおりに補助筋を割り�
   assert.deepEqual(norm(a.secondaryPartsOf('デッドリフト')).sort(), ['広背筋','脚']);
   // スクワットは体幹にも0.5入る
   assert.deepEqual(norm(a.secondaryPartsOf('バーベルスクワット')), ['体幹']);
-  // ショルダープレスは三頭筋のみ（肩は主働なので除外）
-  assert.deepEqual(norm(a.secondaryPartsOf('ショルダープレス')), ['三頭筋']);
+  // ショルダープレスは主働=肩前部、補助=三頭筋・肩中部（2026-11-12 肩を3つに分けた）
+  assert.equal(a.bodyPartOf('ショルダープレス'), '肩前部');
+  assert.deepEqual(norm(a.secondaryPartsOf('ショルダープレス')).sort(), ['三頭筋','肩中部']);
 });
 
 test('volumeClass() は渡した目標表を使う', () => {
@@ -325,7 +327,7 @@ test('bodyPartOf() はレッグレイズ系を体幹にする', () => {
   // 他のレッグ種目・レイズ種目は変わらない
   assert.equal(a.bodyPartOf('レッグプレス'), '脚');
   assert.equal(a.bodyPartOf('レッグカール'), '脚');
-  assert.equal(a.bodyPartOf('サイドレイズ'), '肩');
+  assert.equal(a.bodyPartOf('サイドレイズ'), '肩中部');
 });
 
 test('bodyPartOf() は有酸素マシンを部位に数えない', () => {
@@ -337,8 +339,8 @@ test('bodyPartOf() は有酸素マシンを部位に数えない', () => {
 
 test('secondaryPartsOf() はインクライン/ダンベルプレスの補助筋も拾う', () => {
   const a = app();
-  assert.deepEqual(norm(a.secondaryPartsOf('インクラインプレス')).sort(), ['三頭筋','肩']);
-  assert.deepEqual(norm(a.secondaryPartsOf('インクラインダンベルプレス')).sort(), ['三頭筋','肩']);
+  assert.deepEqual(norm(a.secondaryPartsOf('インクラインプレス')).sort(), ['三頭筋','肩前部']);
+  assert.deepEqual(norm(a.secondaryPartsOf('インクラインダンベルプレス')).sort(), ['三頭筋','肩前部']);
 });
 
 test('secondaryPartsOf() は肘を曲げない種目で二頭筋を数えない', () => {
@@ -548,7 +550,7 @@ test('buildPrompt() は選んだジムの曜日別メニューを渡し、志村
   assert.match(shimura, /■金（肩）\n  必須（この順で固定）: 1\. ショルダープレス（志村マシン）/);
   assert.match(shimura, /■土（胸と背中）\n  必須（この順で固定）: 1\. マシンチェストプレス \/ 2\. マシンインクラインプレス \/ 3\. チンニング（縦グリップ）/);
   assert.match(shimura, /ケーブルマシンは使えません/);
-  assert.match(shimura, /must_exercisesは、次回（火）の「必須」5種目を上の順番/);
+  assert.match(shimura, /must_exercisesは、次回（火）の「必須」6種目を上の順番/);
   const hongo = loadApp({ today:'2026-10-20T20:00:00+09:00' }).buildPrompt('2', 'none', null, 0);   // 火 → 次は水
   assert.match(hongo, /■水（背中＋二頭）\n  必須（この順で固定）: 1\. チンニング（縦グリップ）/);
   assert.match(hongo, /must_exercisesは、次回（水）の「必須」5種目/);
@@ -556,11 +558,16 @@ test('buildPrompt() は選んだジムの曜日別メニューを渡し、志村
   for (const p of [shimura, hongo]) assert.match(p, /バーベルのベンチプレス・バーベルロウ・デッドリフト/);
 });
 
-test('DAY_MENUS は両店舗とも金・土が4種目、火・水が5種目で、火曜にサイドレイズ、志村にケーブル種目がなく、土曜は火・水と同じ種目', () => {
+test('DAY_MENUS は両店舗とも金・土が4種目、火が6種目・水が5種目で、火曜にサイドレイズとリアデルト、志村にケーブル種目がなく、土曜は火・水と同じ種目', () => {
   const m = app().$('DAY_MENUS');
   for (const g of ['1', '2']) {
     for (const d of ['fri', 'sat']) assert.equal(m[g][d].must.length, 4, `${g} ${d}`);
-    for (const d of ['tue', 'wed']) assert.equal(m[g][d].must.length, 5, `${g} ${d}`);
+    assert.equal(m[g].tue.must.length, 6, `${g} tue`);
+    assert.equal(m[g].wed.must.length, 5, `${g} wed`);
+    // 火曜の最後にリアデルト種目（2026-11-12）。部位は肩後部として数えられる
+    const rear = m[g].tue.must[m[g].tue.must.length - 1];
+    assert.match(rear, /リアデルトフライ|リアレイズ/, `${g} tue rear`);
+    assert.equal(app().bodyPartOf(rear), '肩後部', `${g} tue rear part`);
     assert.ok(m[g].tue.must.some(n => /ラテラルレイズ|サイドレイズ/.test(n)), `${g} tue lateral`);
     assert.ok(!m[g].tue.optional.some(n => /ラテラルレイズ|サイドレイズ/.test(n)), `${g} tue optional`);
     // 土曜の種目は火曜か水曜の種目（志村の縦引きだけはチンニング）
@@ -575,13 +582,15 @@ test('DAY_MENUS は両店舗とも金・土が4種目、火・水が5種目で�
 test('軸種目の部位分類: 肘を開くロウは僧帽筋が主働、ロープ種目は広背筋にしない、ダンベルプレスは胸', () => {
   const a = app();
   assert.equal(a.bodyPartOf('Tバーロウ（ワイド・肘を開く）'), '僧帽筋');
-  assert.deepEqual(norm(a.secondaryPartsOf('ケーブルロウ（ワイド・肘を開く）')).sort(), ['二頭筋', '広背筋', '肩'].sort());
+  assert.deepEqual(norm(a.secondaryPartsOf('ケーブルロウ（ワイド・肘を開く）')).sort(), ['二頭筋', '広背筋', '肩後部'].sort());
   assert.equal(a.bodyPartOf('DPLシーテッドロー（縦グリップ・肘を体に沿わせる）'), '広背筋');
   assert.equal(a.bodyPartOf('フロントプル'), '広背筋');
   assert.deepEqual(norm(a.secondaryPartsOf('フロントプル')), ['二頭筋']);
   assert.equal(a.bodyPartOf('ロープオーバーヘッドエクステンション'), '三頭筋');
   assert.equal(a.bodyPartOf('ダンベルプレス'), '胸');
-  assert.equal(a.bodyPartOf('ダンベルショルダープレス'), '肩');
+  assert.equal(a.bodyPartOf('ダンベルショルダープレス'), '肩前部');
+  // 肩は前部・中部・後部に分ける（2026-11-12）
+  for (const [n, p] of [['ラテラルレイズ（マシン）','肩中部'], ['ケーブルサイドレイズ','肩中部'], ['ダンベルサイドレイズ','肩中部'], ['リアデルトフライ（志村マシン）','肩後部'], ['ケーブルリアデルトフライ','肩後部'], ['ダンベルリアレイズ','肩後部'], ['フェイスプル','肩後部'], ['フロントレイズ','肩前部'], ['アーノルドプレス','肩前部'], ['カーフレイズ','脚'], ['レッグレイズ','体幹']]) assert.equal(a.bodyPartOf(n), p, n);
   // 全軸種目が「その他」に落ちない
   const all = Object.values(a.$('DAY_MENUS')).flatMap(g => ['tue','wed','fri','sat'].flatMap(d => g[d].must));
   for (const n of all) assert.notEqual(a.bodyPartOf(n), 'その他', n);
@@ -635,10 +644,12 @@ test('buildPrompt() は曜日で部位を指定し、脚はどの曜日も入れ
   assert.match(tue, /【週の予定（曜日ごとの部位と脚のタイプ）】/);
   assert.match(tue, /次回の筋トレは「水（背中＋二頭）」の予定です。次回メニューの脚は入れないでください（ジムの脚トレは休止中/);
   assert.match(tue, /next_menu.categoryには「背中＋二頭」/);
-  assert.match(tue, /- 火: 胸＋三頭 \/ ラン=朝ラン（Greg 5K。イージーかスピード練習） \/ ジムの脚=なし \/ 自宅ケトルベル=軽め（かかと上げゴブレットスクワット＋片脚RDL。スイングなし）/);
-  assert.match(tue, /・しっかり（水・日）: 両手スイング 1分ごとに10回×5分 \/ 片手スナッチ 1分ごとに左右5回×5分（手首が痛む日は両手スイングに戻す） \/ ゴブレット・ブルガリアンスクワット 左右3×8〜10 \/ RDL 3×10/);
+  assert.match(tue, /- 火: 胸＋三頭 \/ ラン=朝ラン（Greg 5K。イージーかスピード練習） \/ ジムの脚=なし　※翌日がロング走なので、ケトルベルはやらない/);
+  assert.match(tue, /・しっかり（水・RDLなし）: 両手スイング 1分ごとに10回×5分 \/ 片手スナッチ 1分ごとに左右5回×5分（手首が痛む日は両手スイングに戻す） \/ ゴブレット・ブルガリアンスクワット 左右3×8〜10\n/);
+  assert.match(tue, /・しっかり（日）: 両手スイング 1分ごとに10回×5分 \/ 片手スナッチ 1分ごとに左右5回×5分（手首が痛む日は両手スイングに戻す） \/ ゴブレット・ブルガリアンスクワット 左右3×8〜10 \/ RDL 3×10/);
   assert.match(tue, /・腕タバタ（金・日の朝）: 20秒動く/);
-  assert.match(tue, /- 水: 背中＋二頭 \/ ラン=ロング走（朝） \/ ジムの脚=なし \/ 自宅ケトルベル=しっかり（スイング＋スナッチ。KBタバタ可）/);
+  assert.match(tue, /- 水: 背中＋二頭 \/ ラン=ロング走（朝） \/ ジムの脚=なし \/ 自宅ケトルベル=しっかり（スイング＋スナッチ＋ブルガリアン。RDLはしない。KBタバタ可＝週1回はここだけ）/);
+  assert.match(tue, /- 日: .*KBタバタはしない＝バイク4×4がすでに高強度インターバル/);
   assert.match(tue, /- 土: 胸と背中 \/ ラン=なし（第1・3・5土曜は朝から仕事。第2・4土曜は任意で軽いジョグ/);
   for (const [day, next] of [['2026-10-23','土（胸と背中）'], ['2026-10-21','金（肩）'], ['2026-10-25','火（胸＋三頭）']]) {
     const p = loadApp({ today: day + 'T20:00:00+09:00' }).buildPrompt('1', 'none', null, 0);
@@ -703,13 +714,13 @@ test('週間の表はラン・筋トレ・ケトルベルを月〜日で並べ�
   const days = [...h.matchAll(/<tr[^>]*><td>(.)<\/td>/g)].map(m => m[1]).join('');
   assert.equal(days, '月火水木金土日');
   assert.match(h, /<th>🏃 ラン<\/th><th>🏋️ 筋トレ<\/th><th>🔔 ケトルベル<\/th>/);
-  assert.match(h, /<td>火<\/td><td>Greg 5K<\/td><td>胸＋三頭<\/td><td>軽め<\/td>/);
-  assert.match(h, /<td>水<\/td><td>ロング走<\/td><td>背中＋二頭<\/td><td>しっかり・タバタ可<\/td>/);
-  assert.match(h, /<tr class="today"><td>日<\/td><td>バイク4×4<\/td><td>振替のみ<\/td><td>しっかり・タバタ可＋朝に腕タバタ<\/td>/);
+  assert.match(h, /<td>火<\/td><td>Greg 5K<\/td><td>胸＋三頭<\/td><td>なし<\/td>/);
+  assert.match(h, /<td>水<\/td><td>ロング走<\/td><td>背中＋二頭<\/td><td>しっかり（RDLなし）・タバタ可<\/td>/);
+  assert.match(h, /<tr class="today"><td>日<\/td><td>バイク4×4<\/td><td>振替のみ<\/td><td>しっかり＋朝に腕タバタ<\/td>/);
   assert.equal((h.match(/オフ（手術日）/g) || []).length, 2);
   const card = a.renderWeekScheduleCard('1', '2026-11-01');
   assert.match(card, /<table class="wt">/);
-  assert.match(card, /🔔 軽め（火・金・土）/);
+  assert.match(card, /🔔 軽め（金・土）/);
   assert.match(card, /🏋️ ジムの種目（曜日別）/);
 });
 
@@ -724,7 +735,8 @@ test('renderWeekScheduleCard() は月〜日を並べ、月・木はジムなし�
   assert.match(h, /class="wk-row today"><div class="wk-day">水/);
   assert.match(h, /肩・脚なし<span class="wk-tag">次回<\/span>/);
   assert.match(h, /次回は金曜：肩・脚なし（志村坂上の種目）/);
-  assert.match(h, /🔔 ケトルベル: しっかり（スイング＋スナッチ。KBタバタ可）/);
+  assert.match(h, /🔔 ケトルベル: しっかり（スイング＋スナッチ＋ブルガリアン。RDLはしない/);
+  assert.doesNotMatch(h, /<div class="wk-day">火<\/div>.*?🔔 ケトルベル.*?<div class="wk-day">水/s);   // 火曜はケトルベルなし
   assert.match(h, /1\. フロントプル/);
   assert.match(h, /バイク4×4（筋トレをする日は筋トレ前/);
   const hongo = a.renderWeekScheduleCard('2', '2026-10-21');
