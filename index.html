@@ -314,7 +314,7 @@ const LS_KEY_VOL_TARGETS = 'wac_vol_targets';
 const LS_KEY_VOL_RANGE = 'wac_vol_range';
 const LS_KEY_BIKE_UNIT = 'wac_bike_unit';
 const BACKUP_KEYS = [LS_KEY_SESSIONS, LS_KEY_CONDITION, LS_KEY_GYM_EQUIP_1, LS_KEY_GYM_EQUIP_2, LS_KEY_LAST_GYM, LS_KEY_CUSTOM_EX, LS_KEY_BODY, LS_KEY_VOL_TARGETS, LS_KEY_VOL_RANGE, LS_KEY_BIKE_UNIT];
-const DEFAULT_CONDITION = '左ハムストリング肉離れ(2026-07-04受傷)から回復（2026-10-30時点で痛み0）。ジムの脚トレは2026-10-30から休止し、自宅のケトルベル16kgを週6回（金・土=軽め、水=しっかり（ロング走のあとなのでRDLなし）、日=しっかり＋RDL、木=朝に体幹・瞬発メニュー、月=朝に体幹タバタだけ。火はなし。KBタバタは水曜の週1回。2026-11-12見直し）。痛みが出ない範囲で漸進的に。目的は健康維持・筋力向上・体脂肪率の低下。筋トレ週4回が目標(火=胸＋三頭・水=背中＋二頭・金=肩・土=胸と背中。日=行けなかった曜日の振替)、ランニング週3回(Garminコーチ5K・Greg McMillan、2026-11-10開始。火・水ロング走・金。火か金にインターバル走やテンポ走が入る週がある)、バイク4×4は週末に1回(第2・4土曜の週は土曜、それ以外の週は日曜。2026-11-14〜。余裕がある週は30/15を2〜3セットに替えてもよい。ランにスピード練習があった週は30/15にせず4×4のまま)。月・木は手術日でジムなし（朝にウォーキング＋ケトルベルの体幹・瞬発メニュー）。';
+const DEFAULT_CONDITION = '左ハムストリング肉離れ(2026-07-04受傷)から回復（2026-10-30時点で痛み0）。ジムの脚トレは2026-10-30から休止し、自宅のケトルベル16kgを週6回（金・土=軽め、水=しっかり（ロング走のあとなのでRDLなし）、日=しっかり＋RDL、木=朝に体幹・瞬発メニュー、月=朝に体幹タバタだけ。火はなし。KBタバタは水曜の週1回。2026-11-12見直し）。痛みが出ない範囲で漸進的に。目的は健康維持・筋力向上・体脂肪率の低下。筋トレ週4回が目標(火=胸＋三頭・水=背中＋二頭・金=肩・土=胸と背中。日=行けなかった曜日の振替)、ランニング週3回(Garminコーチ5K・Greg McMillan、2026-11-10開始。火・水ロング走・金。火か金にインターバル走やテンポ走が入る週がある)、バイク4×4は週末に1回(第2・4土曜の週は土曜、それ以外の週は日曜。2026-11-14〜。バイクのあとにジムで腹筋。余裕がある週は30/15を2〜3セットに替えてもよい。ランにスピード練習があった週は30/15にせず4×4のまま)。月・木は手術日でジムなし（朝にウォーキング＋ケトルベルの体幹・瞬発メニュー）。';
 
 const GYM_NAMES = { '1': 'エニタイムフィットネス志村坂上店', '2': 'エニタイムフィットネス文京本郷店（本郷三丁目）' };
 const CARDIO_LABELS = { 'none': 'なし', 'walk': 'ウォーキング', 'run': 'ランニング', 'bike': 'バイク4×4', 'bike3015': 'バイク30/15', 'kb': 'ケトルベル', 'kbtabata': 'KBタバタ' };
@@ -830,8 +830,23 @@ function fixedMenuHtml(gymId, slot){
     ${m.optional.length ? `<div class="menu-group-label">🟡 余裕があれば</div>${m.optional.map(n=>`<div class="menu-ex"><div class="n">${escapeHtml(n)}</div></div>`).join('')}` : ''}
     ${DAY_MENUS[gymId].swap ? `<div class="menu-notes">🔁 ${escapeHtml(DAY_MENUS[gymId].swap)}</div>` : ''}`;
 }
+// バイク4×4の日（第2・4土曜の週は土曜、それ以外は日曜）に、バイクのあとジムで行う腹筋（2026-11-14）。それ以外の日は ''（純粋関数）
+function absMenuCardHtml(gymId, dateStr){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const slot = slotForWeek(planForDay(new Date(y, m-1, d).getDay()), dateStr);
+  const a = (DAY_MENUS[gymId]||{}).abs;
+  if(!slot || !slot.abs || !a) return '';
+  return `<div class="card"><h2>💪 今日は腹筋（バイク4×4のあと）</h2>
+    <div class="menu-group-label">🔴 必須</div>${a.must.map(n=>`<div class="menu-ex"><div class="n">${escapeHtml(n)}</div></div>`).join('')}
+    ${a.optional.length ? `<div class="menu-group-label">🟡 余裕があれば</div>${a.optional.map(n=>`<div class="menu-ex"><div class="n">${escapeHtml(n)}</div></div>`).join('')}` : ''}
+    ${a.note ? `<div class="menu-notes">💡 ${escapeHtml(a.note)}</div>` : ''}</div>`;
+}
 // 今日のメニュー（2026-10-30）。行くジムをボタンで切り替える。AIの提案と同じジムなら提案を、違うジムならそのジムの決まった種目を出す
+// バイク4×4の日は、その下に腹筋のカードを足す（2026-11-14）
 function renderTodayMenuCard(lastStrength, gymId, dateStr){
+  return gymMenuCardHtml(lastStrength, gymId, dateStr) + absMenuCardHtml(gymId, dateStr);
+}
+function gymMenuCardHtml(lastStrength, gymId, dateStr){
   const nm = lastStrength && lastStrength.next_menu;
   const toggle = gymToggleHtml(gymId);
   if(nm && (gymIdOfName(nm.gym) === null || gymIdOfName(nm.gym) === gymId)){   // ジム名が読めない古い提案はそのまま出す
@@ -3396,6 +3411,9 @@ const DAY_MENUS = {
            optional: ['ハンマーカール＋フレンチプレスのスーパーセット'] },
     sat: { must: ['マシンチェストプレス', 'マシンインクラインプレス', 'チンニング（縦グリップ）', 'DPLシーテッドロー（縦グリップ・肘を体に沿わせる）'],
            optional: ['ペクトラルフライ（志村）', 'Tバーロウ（ワイド・肘を開く）'] },
+    // バイク4×4の日（WEEK_PLAN の abs）にバイクのあとで行う腹筋（2026-11-14）。志村はケーブルが使えないのでベンチで
+    abs: { must: ['アブドミナル（志村マシン）', 'ロータリートルソー（志村マシン）'], optional: ['リバースクランチ（ベンチ）'],
+           note: 'バイク4×4のあとに。各3セット×12〜15回（ロータリートルソーは左右）。腰に響く日は重さを下げる' },
     swap: '火曜のリアデルトフライのマシンが埋まっていたらダンベルリアレイズ。手首が痛む日はフレンチプレスを片手ダンベルオーバーヘッドエクステンション（縦持ち）に。Tバーロウが埋まっていたら DPLシーテッドロー（ワイド・肘を開く）。シュラッグはスミスかダンベルでストラップを使う。ショルダープレスは2台のうち手首が楽な方。チンニングは逆手を避け、8回未満ならアシストかネガティブ、12回超なら加重（アシスト量・加重はnameかtargetに書く）。',
   },
   '2': {
@@ -3407,6 +3425,8 @@ const DAY_MENUS = {
            optional: ['バイセップカール（本郷マシン）＋ロープオーバーヘッドエクステンションのスーパーセット'] },
     sat: { must: ['ダンベルプレス', 'インクラインダンベルプレス', 'チンニング（縦グリップ）', 'シーテッドロー（本郷マシン・肘を体に沿わせる）'],
            optional: ['ペクトラルフライ（本郷）', 'ケーブルロウ（ワイド・肘を開く）'] },
+    abs: { must: ['アブドミナル（本郷マシン）', 'ロータリートルソー（本郷マシン）'], optional: ['ケーブルクランチ'],
+           note: 'バイク4×4のあとに。各3セット×12〜15回（ロータリートルソーは左右）。腰に響く日は重さを下げる' },
     swap: 'ダンベルは手のひらをやや内向きに。手首と握力が持たない日はインクラインダンベルプレスをスミスインクラインプレスに。シュラッグはストラップを使う。ショルダープレスは座って行う。チンニングは逆手を避け、8回未満ならアシストかネガティブ、12回超なら加重（アシスト量・加重はnameかtargetに書く）。',
   },
 };
@@ -3414,6 +3434,7 @@ const DAY_MENUS = {
 // 週の予定（2026-10-20 決定、2026-10-21 曜日別の部位に更新、2026-10-30 筋トレ週4回＋日曜は振替枠・第2/4土曜は任意ジョグ・ジムの脚トレ休止＋自宅ケトルベル週5回）。
 // 2026-11-14: バイク4×4は週末に1回。第2・4土曜（朝の仕事がない）の週は土曜に回し、その週の日曜はバイクなし（土曜の任意ジョグはやめる）。
 // その週だけの上書きは alt に書き、slotForWeek() で重ねる（satNth＝その週の土曜が第何土曜か）。デイリーホームも同じ規則で読む。
+// abs:true の日（＝バイク4×4の日）は、バイクのあとにジムで腹筋（DAY_MENUS の abs、2026-11-14〜）。
 // 月・木は手術日でジムなし（朝にウォーキング＋KB体幹・瞬発＝OFF_DAY_PLAN、2026-11-01〜）。ランはGarminコーチ5K（Greg McMillan、2026-11-10開始）で火・水(ロング走)・金。火か金にスピード練習が入る。
 // ジムの脚トレは 2026-10-30 から休止（12月中旬に見直し。戻すならまず脚Aを1枠）。脚は自宅のケトルベル（16kg）で。
 // kb: 金・土=軽め、水・日=しっかり（水はロング走のあとなのでRDLなし）、火=なし（翌日ロング走）。KBタバタは水曜だけ＝週1回（日曜はバイク4×4がHIITなので重ねない）。ランの日はランの後に行う。
@@ -3423,9 +3444,9 @@ const WEEK_PLAN = [
   { days:[3], key:'wed', label:'水', focus:'背中＋二頭', run:'ロング走（朝）', runShort:'ロング走', gymShort:'背中＋二頭', kbShort:'しっかり（RDLなし）・タバタ可', kbLevel:'heavywed', tabata:true, leg:null, kb:'しっかり（スイング＋スナッチ＋ブルガリアン。RDLはしない。KBタバタ可＝週1回はここだけ）', note:'ロング走のあと。疲れた状態でのRDLはハムに負担が大きいので外す（スイングとスナッチでヒンジは足りる）。翌日の木曜はジムもランもない（朝の体幹・瞬発だけ）' },
   { days:[5], key:'fri', label:'金', focus:'肩', run:'朝ラン（Greg 5K。イージーかスピード練習）', runShort:'Greg 5K', gymShort:'肩', kbShort:'軽め＋朝に腕タバタ', kbLevel:'light', kbExtra:['armtabata'], leg:null, kb:'軽め（かかと上げゴブレットスクワット＋片脚RDL。スイングなし）＋朝ランの後に腕タバタ4分', note:'朝にインターバル走やテンポ走をした日は、ケトルベルの重さ・回数を増やさない' },
   { days:[6], key:'sat', label:'土', focus:'胸と背中', runShort:'なし', gymShort:'胸と背中', kbShort:'軽め', kbLevel:'light', run:'なし（第1・3・5土曜は朝から仕事）', leg:null, kb:'軽め〜ふつう', note:'胸と背中は火・水と同じ種目。仕事のあとで疲れが強い日は余裕枠を削って必須4種目だけにしてよい',
-    alt:{ satNth:[2,4], runShort:'バイク4×4', run:'バイク4×4（第2・4土曜。筋トレをする日は筋トレ前。余裕がある週は30/15に替えてもよいが、ランにスピード練習があった週は4×4のまま）', kb:'軽め〜ふつう（バイク4×4のあとに）' } },
-  { days:[0], key:'sun', label:'日', focus:'振替（火〜土で行けなかった分）', runShort:'バイク4×4', gymShort:'振替のみ', kbShort:'しっかり＋朝に腕タバタ', kbLevel:'heavy', kbExtra:['armtabata', 'reardelt'], run:'バイク4×4（筋トレをする日は筋トレ前。余裕がある週は30/15に替えてもよいが、ランにスピード練習があった週は4×4のまま）', leg:null, kb:'しっかり（スイング＋スナッチ＋ブルガリアン＋RDL。KBタバタはしない＝バイク4×4がすでに高強度インターバル）＋朝に腕タバタ4分＋リアデルトロウ（上半身メニューの腕2種目は腕タバタに置き換え）', note:'筋トレは火・水・金・土の週4回が目標。日曜は行けなかった曜日の分だけ行い、週4回できていれば筋トレは休み（バイクとケトルベルだけ）。翌日の月曜は体幹タバタだけで脚を休める',
-    alt:{ satNth:[2,4], runShort:'なし（バイクは土曜）', run:'なし（バイク4×4は土曜に済ませた週）', kb:'しっかり（スイング＋スナッチ＋ブルガリアン＋RDL。KBタバタはしない＝週1回は水曜だけ）＋朝に腕タバタ4分＋リアデルトロウ（上半身メニューの腕2種目は腕タバタに置き換え）',
+    alt:{ satNth:[2,4], runShort:'バイク4×4', gymShort:'胸と背中＋腹筋', abs:true, run:'バイク4×4（第2・4土曜。筋トレをする日は筋トレ前。余裕がある週は30/15に替えてもよいが、ランにスピード練習があった週は4×4のまま）', kb:'軽め〜ふつう（バイク4×4のあとに）' } },
+  { days:[0], key:'sun', label:'日', focus:'振替（火〜土で行けなかった分）', runShort:'バイク4×4', gymShort:'腹筋＋振替', abs:true, kbShort:'しっかり＋朝に腕タバタ', kbLevel:'heavy', kbExtra:['armtabata', 'reardelt'], run:'バイク4×4（筋トレをする日は筋トレ前。余裕がある週は30/15に替えてもよいが、ランにスピード練習があった週は4×4のまま）', leg:null, kb:'しっかり（スイング＋スナッチ＋ブルガリアン＋RDL。KBタバタはしない＝バイク4×4がすでに高強度インターバル）＋朝に腕タバタ4分＋リアデルトロウ（上半身メニューの腕2種目は腕タバタに置き換え）', note:'筋トレは火・水・金・土の週4回が目標。日曜は行けなかった曜日の分だけ行い、週4回できていれば上半身は休み（バイク4×4と腹筋、ケトルベルだけ）。翌日の月曜は体幹タバタだけで脚を休める',
+    alt:{ satNth:[2,4], runShort:'なし（バイクは土曜）', run:'なし（バイク4×4は土曜に済ませた週）', gymShort:'振替のみ', abs:false, kb:'しっかり（スイング＋スナッチ＋ブルガリアン＋RDL。KBタバタはしない＝週1回は水曜だけ）＋朝に腕タバタ4分＋リアデルトロウ（上半身メニューの腕2種目は腕タバタに置き換え）',
       note:'筋トレは火・水・金・土の週4回が目標。日曜は行けなかった曜日の分だけ行い、週4回できていれば筋トレは休み（ケトルベルだけ）。翌日の月曜は体幹タバタだけで脚を休める' } },
 ];
 // 月・木（手術日）。ジムもランもなく、朝にウォーキング＋ケトルベルの体幹・瞬発メニュー（2026-11-01）。月は体幹タバタだけ（2026-11-12、byDay）。
@@ -3623,6 +3644,7 @@ function renderWeekScheduleCard(gymId, dateStr){
       <div class="wk-focus">${escapeHtml(slot.focus)}・${escapeHtml(legLabel(slot.leg))}${slot.key === next.key ? '<span class="wk-tag">次回</span>' : ''}</div>
       <div class="wk-meta">${escapeHtml(slot.run)}</div>
       ${slot.kb ? `<div class="wk-meta">🔔 ケトルベル: ${escapeHtml(slot.kb)}</div>` : ''}
+      ${slot.abs && menus.abs ? `<div class="wk-meta">💪 腹筋（バイク4×4のあと）: ${escapeHtml(menus.abs.must.concat(menus.abs.optional).join('・'))}</div>` : ''}
       <div class="wk-ex">${ex}</div>
     </div></div>`;
   });
@@ -3724,7 +3746,7 @@ ${workoutText}`
 
 【ユーザー情報】
 ${getCondition()}
-腹筋(アブドミナル、ロータリートルソー等)は自宅で別途鍛えているため、ジムでの提案は控えめにしてください（must_exercisesには含めず、optional_exercisesに含める場合も1種目までにする）。
+腹筋は、バイク4×4の日（第2・4土曜の週は土曜、それ以外の週は日曜）にバイクのあとジムで決まったメニュー（アブドミナル・ロータリートルソー）を行い、月・木の朝の体幹タバタでも鍛えています。must_exercises・optional_exercisesには腹筋を入れないでください。
 ${weeklyVolumeText()}
 
 【曜日別の分け方】

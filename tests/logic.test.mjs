@@ -750,7 +750,7 @@ test('週間の表はラン・筋トレ・ケトルベルを月〜日で並べ�
   assert.match(h, /<th>🏃 ラン<\/th><th>🏋️ 筋トレ<\/th><th>🔔 ケトルベル<\/th>/);
   assert.match(h, /<td>火<\/td><td>Greg 5K<\/td><td>胸＋三頭<\/td><td>なし<\/td>/);
   assert.match(h, /<td>水<\/td><td>ロング走<\/td><td>背中＋二頭<\/td><td>しっかり（RDLなし）・タバタ可<\/td>/);
-  assert.match(h, /<tr class="today"><td>日<\/td><td>バイク4×4<\/td><td>振替のみ<\/td><td>しっかり＋朝に腕タバタ<\/td>/);
+  assert.match(h, /<tr class="today"><td>日<\/td><td>バイク4×4<\/td><td>腹筋＋振替<\/td><td>しっかり＋朝に腕タバタ<\/td>/);   // 10/31は第5土曜なのでバイクは日曜
   assert.equal((h.match(/オフ（手術日）/g) || []).length, 2);
   const card = a.renderWeekScheduleCard('1', '2026-11-01');
   assert.match(card, /<table class="wt">/);
@@ -802,4 +802,34 @@ test('今日のメニューはジムをボタンで切り替え、AIの提案と
   const old = a.renderTodayMenuCard({ date:'2026-09-01', next_menu:{ category:'Push', must_exercises:[{ name:'X', target:'old' }] } }, '2', '2026-10-30');
   assert.match(old, /old/);
   assert.equal(a.gymIdOfName('エニタイムフィットネス文京本郷店（本郷三丁目）'), '2');
+});
+
+test('バイク4×4の日はバイクのあとジムで腹筋（第2・4土曜の週は土曜、それ以外は日曜。2026-11-14）', () => {
+  const a = app();
+  const m = a.$('DAY_MENUS');
+  for (const g of ['1', '2']) {
+    const abs = m[g].abs;
+    assert.equal(abs.must.length, 2, g);
+    for (const n of [...abs.must, ...abs.optional]) assert.equal(a.bodyPartOf(n), '体幹', `${g} ${n}`);
+  }
+  assert.ok([...m['1'].abs.must, ...m['1'].abs.optional].every(n => !/ケーブル|ロープ/.test(n)), '志村はケーブルなし');
+  // 今日のメニューの下に腹筋のカード（バイクの日だけ）
+  for (const ds of ['2026-11-14', '2026-11-22']) {   // 第2土曜／第3土曜の週の日曜
+    const h = a.renderTodayMenuCard(null, '1', ds);
+    assert.match(h, /💪 今日は腹筋（バイク4×4のあと）.*アブドミナル（志村マシン）.*ロータリートルソー（志村マシン）.*リバースクランチ（ベンチ）/s, ds);
+  }
+  assert.match(a.renderTodayMenuCard(null, '2', '2026-11-14'), /アブドミナル（本郷マシン）.*ケーブルクランチ/s);
+  for (const ds of ['2026-11-15', '2026-11-21', '2026-11-13']) {   // バイクのない日曜・土曜と金曜
+    assert.doesNotMatch(a.renderTodayMenuCard(null, '1', ds), /今日は腹筋/, ds);
+  }
+  // 週の表と週間スケジュールのカード
+  assert.match(a.weekTableHtml('2026-11-14'), /<td>土<\/td><td>バイク4×4<\/td><td>胸と背中＋腹筋<\/td>/);
+  assert.match(a.weekTableHtml('2026-11-14'), /<td>日<\/td><td>なし（バイクは土曜）<\/td><td>振替のみ<\/td>/);
+  const card = a.renderWeekScheduleCard('2', '2026-11-14');
+  assert.match(card, /<div class="wk-day">土<\/div>.*?💪 腹筋（バイク4×4のあと）: アブドミナル（本郷マシン）.*?<div class="wk-day">日<\/div>/s);
+  assert.doesNotMatch(card.slice(card.indexOf('<div class="wk-day">日</div>')), /💪 腹筋/);
+  // AIには腹筋を提案させない
+  const p = a.buildPrompt('1', 'none', null, 0);
+  assert.match(p, /must_exercises・optional_exercisesには腹筋を入れないでください/);
+  assert.doesNotMatch(p, /自宅で別途鍛えているため/);
 });
