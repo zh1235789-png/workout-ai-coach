@@ -314,7 +314,7 @@ const LS_KEY_VOL_TARGETS = 'wac_vol_targets';
 const LS_KEY_VOL_RANGE = 'wac_vol_range';
 const LS_KEY_BIKE_UNIT = 'wac_bike_unit';
 const BACKUP_KEYS = [LS_KEY_SESSIONS, LS_KEY_CONDITION, LS_KEY_GYM_EQUIP_1, LS_KEY_GYM_EQUIP_2, LS_KEY_LAST_GYM, LS_KEY_CUSTOM_EX, LS_KEY_BODY, LS_KEY_VOL_TARGETS, LS_KEY_VOL_RANGE, LS_KEY_BIKE_UNIT];
-const DEFAULT_CONDITION = '左ハムストリング肉離れ(2026-07-04受傷)から回復（2026-10-30時点で痛み0）。ジムの脚トレは2026-10-30から休止し、自宅のケトルベル16kgを週6回（金・土=軽め、水=しっかり（ロング走のあとなのでRDLなし）、日=しっかり＋RDL、木=朝に体幹・瞬発メニュー、月=朝に体幹タバタだけ。火はなし。KBタバタは水曜の週1回。2026-11-12見直し）。痛みが出ない範囲で漸進的に。目的は健康維持・筋力向上・体脂肪率の低下。筋トレ週4回が目標(火=胸＋三頭・水=背中＋二頭・金=肩・土=胸と背中。日=行けなかった曜日の振替)、ランニング週3回(Garminコーチ5K・Greg McMillan、2026-11-10開始。火・水ロング走・金。火か金にインターバル走やテンポ走が入る週がある。第2・4土曜は任意で軽いジョグ)、日曜にバイク4×4(余裕がある週は30/15を2〜3セットに替えてもよい。ランにスピード練習があった週は30/15にせず4×4のまま)。月・木は手術日でジムなし（朝にウォーキング＋ケトルベルの体幹・瞬発メニュー）。';
+const DEFAULT_CONDITION = '左ハムストリング肉離れ(2026-07-04受傷)から回復（2026-10-30時点で痛み0）。ジムの脚トレは2026-10-30から休止し、自宅のケトルベル16kgを週6回（金・土=軽め、水=しっかり（ロング走のあとなのでRDLなし）、日=しっかり＋RDL、木=朝に体幹・瞬発メニュー、月=朝に体幹タバタだけ。火はなし。KBタバタは水曜の週1回。2026-11-12見直し）。痛みが出ない範囲で漸進的に。目的は健康維持・筋力向上・体脂肪率の低下。筋トレ週4回が目標(火=胸＋三頭・水=背中＋二頭・金=肩・土=胸と背中。日=行けなかった曜日の振替)、ランニング週3回(Garminコーチ5K・Greg McMillan、2026-11-10開始。火・水ロング走・金。火か金にインターバル走やテンポ走が入る週がある)、バイク4×4は週末に1回(第2・4土曜の週は土曜、それ以外の週は日曜。2026-11-14〜。余裕がある週は30/15を2〜3セットに替えてもよい。ランにスピード練習があった週は30/15にせず4×4のまま)。月・木は手術日でジムなし（朝にウォーキング＋ケトルベルの体幹・瞬発メニュー）。';
 
 const GYM_NAMES = { '1': 'エニタイムフィットネス志村坂上店', '2': 'エニタイムフィットネス文京本郷店（本郷三丁目）' };
 const CARDIO_LABELS = { 'none': 'なし', 'walk': 'ウォーキング', 'run': 'ランニング', 'bike': 'バイク4×4', 'bike3015': 'バイク30/15', 'kb': 'ケトルベル', 'kbtabata': 'KBタバタ' };
@@ -644,8 +644,9 @@ const STRETCH_GROUPS = [
 function stretchOrder(dateStr){
   const [y,m,d] = dateStr.split('-').map(Number);
   const wd = new Date(y, m-1, d).getDay();
-  const slot = WEEK_PLAN.find(p=>p.days.includes(wd));
-  const runDay = wd === 6 ? isJogSaturday(dateStr) : !!(slot && /ラン|走/.test(slot.run) && !/^なし/.test(slot.run));
+  const slot = slotForWeek(WEEK_PLAN.find(p=>p.days.includes(wd)), dateStr);
+  // バイク4×4の説明文にも「ラン」が出てくるので、先頭が「なし」「バイク」の日はランの日にしない
+  const runDay = !!(slot && /ラン|走/.test(slot.run) && !/^(なし|バイク)/.test(slot.run));
   return { runDay, keys: runDay ? ['morning','postrun','night','posture'] : ['night','posture','morning','postrun'] };
 }
 function renderStretch(){
@@ -3411,6 +3412,8 @@ const DAY_MENUS = {
 };
 
 // 週の予定（2026-10-20 決定、2026-10-21 曜日別の部位に更新、2026-10-30 筋トレ週4回＋日曜は振替枠・第2/4土曜は任意ジョグ・ジムの脚トレ休止＋自宅ケトルベル週5回）。
+// 2026-11-14: バイク4×4は週末に1回。第2・4土曜（朝の仕事がない）の週は土曜に回し、その週の日曜はバイクなし（土曜の任意ジョグはやめる）。
+// その週だけの上書きは alt に書き、slotForWeek() で重ねる（satNth＝その週の土曜が第何土曜か）。デイリーホームも同じ規則で読む。
 // 月・木は手術日でジムなし（朝にウォーキング＋KB体幹・瞬発＝OFF_DAY_PLAN、2026-11-01〜）。ランはGarminコーチ5K（Greg McMillan、2026-11-10開始）で火・水(ロング走)・金。火か金にスピード練習が入る。
 // ジムの脚トレは 2026-10-30 から休止（12月中旬に見直し。戻すならまず脚Aを1枠）。脚は自宅のケトルベル（16kg）で。
 // kb: 金・土=軽め、水・日=しっかり（水はロング走のあとなのでRDLなし）、火=なし（翌日ロング走）。KBタバタは水曜だけ＝週1回（日曜はバイク4×4がHIITなので重ねない）。ランの日はランの後に行う。
@@ -3419,8 +3422,11 @@ const WEEK_PLAN = [
   { days:[2], key:'tue', label:'火', focus:'胸＋三頭', run:'朝ラン（Greg 5K。イージーかスピード練習）', runShort:'Greg 5K', gymShort:'胸＋三頭', kbShort:'なし', kbLevel:null, leg:null, kb:null, note:'翌日がロング走なので、ケトルベルはやらない（脚とハムを休める日。2026-11-12〜）' },
   { days:[3], key:'wed', label:'水', focus:'背中＋二頭', run:'ロング走（朝）', runShort:'ロング走', gymShort:'背中＋二頭', kbShort:'しっかり（RDLなし）・タバタ可', kbLevel:'heavywed', tabata:true, leg:null, kb:'しっかり（スイング＋スナッチ＋ブルガリアン。RDLはしない。KBタバタ可＝週1回はここだけ）', note:'ロング走のあと。疲れた状態でのRDLはハムに負担が大きいので外す（スイングとスナッチでヒンジは足りる）。翌日の木曜はジムもランもない（朝の体幹・瞬発だけ）' },
   { days:[5], key:'fri', label:'金', focus:'肩', run:'朝ラン（Greg 5K。イージーかスピード練習）', runShort:'Greg 5K', gymShort:'肩', kbShort:'軽め＋朝に腕タバタ', kbLevel:'light', kbExtra:['armtabata'], leg:null, kb:'軽め（かかと上げゴブレットスクワット＋片脚RDL。スイングなし）＋朝ランの後に腕タバタ4分', note:'朝にインターバル走やテンポ走をした日は、ケトルベルの重さ・回数を増やさない' },
-  { days:[6], key:'sat', label:'土', focus:'胸と背中', runShort:'第2・4週だけ軽いジョグ', gymShort:'胸と背中', kbShort:'軽め', kbLevel:'light', run:'なし（第1・3・5土曜は朝から仕事。第2・4土曜は任意で軽いジョグ20〜30分か散歩・Garminコーチ外）', leg:null, kb:'軽め〜ふつう（ジョグの日はその後に）', note:'胸と背中は火・水と同じ種目。仕事のあとで疲れが強い日は余裕枠を削って必須4種目だけにしてよい' },
-  { days:[0], key:'sun', label:'日', focus:'振替（火〜土で行けなかった分）', runShort:'バイク4×4', gymShort:'振替のみ', kbShort:'しっかり＋朝に腕タバタ', kbLevel:'heavy', kbExtra:['armtabata', 'reardelt'], run:'バイク4×4（筋トレをする日は筋トレ前。余裕がある週は30/15に替えてもよいが、ランにスピード練習があった週は4×4のまま）', leg:null, kb:'しっかり（スイング＋スナッチ＋ブルガリアン＋RDL。KBタバタはしない＝バイク4×4がすでに高強度インターバル）＋朝に腕タバタ4分＋リアデルトロウ（上半身メニューの腕2種目は腕タバタに置き換え）', note:'筋トレは火・水・金・土の週4回が目標。日曜は行けなかった曜日の分だけ行い、週4回できていれば筋トレは休み（バイクとケトルベルだけ）。翌日の月曜は体幹タバタだけで脚を休める' },
+  { days:[6], key:'sat', label:'土', focus:'胸と背中', runShort:'なし', gymShort:'胸と背中', kbShort:'軽め', kbLevel:'light', run:'なし（第1・3・5土曜は朝から仕事）', leg:null, kb:'軽め〜ふつう', note:'胸と背中は火・水と同じ種目。仕事のあとで疲れが強い日は余裕枠を削って必須4種目だけにしてよい',
+    alt:{ satNth:[2,4], runShort:'バイク4×4', run:'バイク4×4（第2・4土曜。筋トレをする日は筋トレ前。余裕がある週は30/15に替えてもよいが、ランにスピード練習があった週は4×4のまま）', kb:'軽め〜ふつう（バイク4×4のあとに）' } },
+  { days:[0], key:'sun', label:'日', focus:'振替（火〜土で行けなかった分）', runShort:'バイク4×4', gymShort:'振替のみ', kbShort:'しっかり＋朝に腕タバタ', kbLevel:'heavy', kbExtra:['armtabata', 'reardelt'], run:'バイク4×4（筋トレをする日は筋トレ前。余裕がある週は30/15に替えてもよいが、ランにスピード練習があった週は4×4のまま）', leg:null, kb:'しっかり（スイング＋スナッチ＋ブルガリアン＋RDL。KBタバタはしない＝バイク4×4がすでに高強度インターバル）＋朝に腕タバタ4分＋リアデルトロウ（上半身メニューの腕2種目は腕タバタに置き換え）', note:'筋トレは火・水・金・土の週4回が目標。日曜は行けなかった曜日の分だけ行い、週4回できていれば筋トレは休み（バイクとケトルベルだけ）。翌日の月曜は体幹タバタだけで脚を休める',
+    alt:{ satNth:[2,4], runShort:'なし（バイクは土曜）', run:'なし（バイク4×4は土曜に済ませた週）', kb:'しっかり（スイング＋スナッチ＋ブルガリアン＋RDL。KBタバタはしない＝週1回は水曜だけ）＋朝に腕タバタ4分＋リアデルトロウ（上半身メニューの腕2種目は腕タバタに置き換え）',
+      note:'筋トレは火・水・金・土の週4回が目標。日曜は行けなかった曜日の分だけ行い、週4回できていれば筋トレは休み（ケトルベルだけ）。翌日の月曜は体幹タバタだけで脚を休める' } },
 ];
 // 月・木（手術日）。ジムもランもなく、朝にウォーキング＋ケトルベルの体幹・瞬発メニュー（2026-11-01）。月は体幹タバタだけ（2026-11-12、byDay）。
 // WEEK_PLAN に入れるとジムの枠（次回の筋トレ）として数えられてしまうので別にする。デイリーホームも読む
@@ -3428,10 +3434,10 @@ const OFF_DAY_PLAN = {
   days:[1,4], key:'off', label:'月・木', focus:'オフ（手術日）', run:'朝ウォーキング20〜30分', runShort:'朝ウォーキング', gymShort:'オフ（手術日）',
   kbShort:'体幹・瞬発（朝）', kbLevel:'core', kb:'体幹・瞬発（朝・手術前。ハイプル→脚3種目を3周→体幹タバタ4分）',
   note:'前日（水）にスイングをしっかりやるので、股関節で振る種目はハイプルだけにしてハムを休ませる。手術前なので握力を使い切らない',
-  // 曜日ごとの上書き（2026-11-12）。月は前日（日）がしっかりKB＋バイク4×4なので体幹タバタだけにして脚とハムを休める
+  // 曜日ごとの上書き（2026-11-12）。月は前日（日）がしっかりKB（第1・3・5土曜の週はバイク4×4も）なので体幹タバタだけにして脚とハムを休める
   byDay:{
     1:{ label:'月', kbShort:'体幹タバタ（朝）', kbLevel:'coretabata', kb:'体幹タバタ4分だけ（朝・手術前）',
-        note:'前日（日）にスイング・スナッチ・RDLとバイク4×4をやるので、月曜は脚とハムを休める日。ハイプル・ランジ・カーフはしない。手術前なので握力を使い切らない' },
+        note:'前日（日）にスイング・スナッチ・RDL（第1・3・5土曜の週はバイク4×4も）をやるので、月曜は脚とハムを休める日。ハイプル・ランジ・カーフはしない。手術前なので握力を使い切らない' },
     4:{ label:'木' },
   },
 };
@@ -3499,10 +3505,15 @@ function gymCountThisWeek(dateStr){
   const from = mondayOf(dateStr);
   return new Set(getSessions().filter(s=>s.type!=='cardio' && s.date && s.date >= from && s.date <= dateStr).map(s=>s.date)).size;
 }
-// 第2・4土曜は朝ジョグ可（第1・3・5土曜は朝から仕事）
-function isJogSaturday(dateStr){
+// その日を含む週（月曜始まり）の土曜が、その月の第何土曜か（1〜5）。第2・4土曜は朝の仕事がない（純粋関数）
+function satNthOfWeek(dateStr){
   const [y,m,d] = dateStr.split('-').map(Number);
-  return new Date(y, m-1, d).getDay() === 6 && [2,4].includes(Math.ceil(d/7));
+  const wd = new Date(y, m-1, d).getDay();
+  return Math.ceil(new Date(y, m-1, d + (wd === 0 ? -1 : 6 - wd)).getDate() / 7);
+}
+// WEEK_PLAN の枠に、その週だけの上書き（alt）を重ねる。第2・4土曜の週はバイク4×4が土曜、日曜はなし（2026-11-14、純粋関数）
+function slotForWeek(slot, dateStr){
+  return slot && slot.alt && (slot.alt.satNth || []).includes(satNthOfWeek(dateStr)) ? Object.assign({}, slot, slot.alt) : slot;
 }
 // 今日の次の筋トレ枠（日曜は振替枠なので、土曜の時点で週4回済みなら飛ばして火曜へ）
 function nextGymSlot(dateStr){
@@ -3530,7 +3541,7 @@ function chinDoneThisWeek(dateStr){
 }
 function weekPlanText(dateStr){
   const next = nextGymSlot(dateStr);
-  const rows = WEEK_PLAN.map(p=>`- ${p.label}: ${p.focus} / ラン=${p.run} / ジムの脚=${p.leg ? p.leg : 'なし'}${p.kb ? ' / 自宅ケトルベル='+p.kb : ''}${p.note ? '　※'+p.note : ''}`).join('\n');
+  const rows = WEEK_PLAN.map(p=>`- ${p.label}: ${p.focus} / ラン=${p.run}${p.alt ? `（第${p.alt.satNth.join('・')}土曜の週は ${p.alt.run}）` : ''} / ジムの脚=${p.leg ? p.leg : 'なし'}${p.kb ? ' / 自宅ケトルベル='+p.kb : ''}${p.note ? '　※'+p.note : ''}`).join('\n');
   const legTxt = next.leg === null ? '入れないでください（ジムの脚トレは休止中。optional_exercisesは上半身の1〜2種目だけ）'
     : next.leg === '不足時のみ' ? '週の脚のセット数が目標を下回るときだけ、その週にやっていないタイプ（A/B/C）を1種目入れてください'
     : 'タイプ'+next.leg+'にしてください';
@@ -3577,7 +3588,7 @@ function weekTableHtml(dateStr){
   let rows = '';
   [1,2,3,4,5,6,0].forEach(wd=>{
     const label = '日月火水木金土'[wd];
-    const slot = WEEK_PLAN.find(p=>p.days.includes(wd));
+    const slot = slotForWeek(WEEK_PLAN.find(p=>p.days.includes(wd)), dateStr);
     const cls = wd === wdToday ? ' class="today"' : '';
     rows += slot
       ? `<tr${cls}><td>${label}</td><td>${escapeHtml(slot.runShort||'')}</td><td>${escapeHtml(slot.gymShort||slot.focus)}</td><td>${escapeHtml(slot.kbShort||'')}</td></tr>`
@@ -3599,7 +3610,7 @@ function renderWeekScheduleCard(gymId, dateStr){
   let rows = '';
   [1,2,3,4,5,6,0].forEach(wd=>{
     const label = '日月火水木金土'[wd];
-    const slot = WEEK_PLAN.find(p=>p.days.includes(wd));
+    const slot = slotForWeek(WEEK_PLAN.find(p=>p.days.includes(wd)), today);
     const cls = 'wk-row' + (wd === wdToday ? ' today' : '');
     if(!slot){
       const o = offDayPlanFor(wd) || OFF_DAY_PLAN;
@@ -3609,7 +3620,7 @@ function renderWeekScheduleCard(gymId, dateStr){
     const menu = menus[slot.key];
     const ex = menu ? menu.must.map((n,i)=>`${i+1}. ${escapeHtml(n)}`).join('<br>') : escapeHtml(slot.note || '');
     rows += `<div class="${cls}"><div class="wk-day">${label}</div><div class="wk-body">
-      <div class="wk-focus">${escapeHtml(slot.focus)}・${escapeHtml(legLabel(slot.leg))}${slot === next ? '<span class="wk-tag">次回</span>' : ''}</div>
+      <div class="wk-focus">${escapeHtml(slot.focus)}・${escapeHtml(legLabel(slot.leg))}${slot.key === next.key ? '<span class="wk-tag">次回</span>' : ''}</div>
       <div class="wk-meta">${escapeHtml(slot.run)}</div>
       ${slot.kb ? `<div class="wk-meta">🔔 ケトルベル: ${escapeHtml(slot.kb)}</div>` : ''}
       <div class="wk-ex">${ex}</div>

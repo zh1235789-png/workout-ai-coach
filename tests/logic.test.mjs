@@ -650,7 +650,9 @@ test('buildPrompt() は曜日で部位を指定し、脚はどの曜日も入れ
   assert.match(tue, /・腕タバタ（金・日の朝）: 20秒動く/);
   assert.match(tue, /- 水: 背中＋二頭 \/ ラン=ロング走（朝） \/ ジムの脚=なし \/ 自宅ケトルベル=しっかり（スイング＋スナッチ＋ブルガリアン。RDLはしない。KBタバタ可＝週1回はここだけ）/);
   assert.match(tue, /- 日: .*KBタバタはしない＝バイク4×4がすでに高強度インターバル/);
-  assert.match(tue, /- 土: 胸と背中 \/ ラン=なし（第1・3・5土曜は朝から仕事。第2・4土曜は任意で軽いジョグ/);
+  assert.match(tue, /- 土: 胸と背中 \/ ラン=なし（第1・3・5土曜は朝から仕事）（第2・4土曜の週は バイク4×4（第2・4土曜。筋トレをする日は筋トレ前/);
+  assert.match(tue, /- 日: 振替（火〜土で行けなかった分） \/ ラン=バイク4×4（.*?）（第2・4土曜の週は なし（バイク4×4は土曜に済ませた週））/);
+  assert.doesNotMatch(tue, /ジョグ/);
   for (const [day, next] of [['2026-10-23','土（胸と背中）'], ['2026-10-21','金（肩）'], ['2026-10-25','火（胸＋三頭）']]) {
     const p = loadApp({ today: day + 'T20:00:00+09:00' }).buildPrompt('1', 'none', null, 0);
     assert.match(p, new RegExp('次回の筋トレは「' + next.replace(/[()（）]/g, '.') + '」の予定です。次回メニューの脚は入れないでください'));
@@ -696,16 +698,48 @@ test('筋トレは週4回が目標: 土曜の時点で4回済みなら日曜の�
   assert.match(c, /次回は日曜（振替枠）です/);
 });
 
-test('土曜の朝ジョグは第2・4土曜だけ（ストレッチの順番に反映）', () => {
+test('バイク4×4は第2・4土曜の週は土曜、それ以外の週は日曜（2026-11-14）', () => {
   const a = app();
-  assert.equal(a.isJogSaturday('2026-11-14'), true);   // 第2土曜
-  assert.equal(a.isJogSaturday('2026-11-28'), true);   // 第4土曜
-  assert.equal(a.isJogSaturday('2026-11-07'), false);  // 第1土曜
-  assert.equal(a.isJogSaturday('2026-10-31'), false);  // 第5土曜
-  assert.equal(a.isJogSaturday('2026-11-13'), false);  // 金曜
-  assert.equal(a.stretchOrder('2026-11-14').runDay, true);
-  assert.equal(a.stretchOrder('2026-11-21').runDay, false);
-  assert.equal(a.stretchOrder('2026-11-13').runDay, true);
+  // その週（月曜始まり）の土曜が第何土曜か。日曜は前日の土曜で決まり、月をまたいでもよい
+  assert.equal(a.satNthOfWeek('2026-11-09'), 2);   // 月 → 土曜は11/14
+  assert.equal(a.satNthOfWeek('2026-11-14'), 2);
+  assert.equal(a.satNthOfWeek('2026-11-15'), 2);   // 日 → 前日の11/14
+  assert.equal(a.satNthOfWeek('2026-11-28'), 4);
+  assert.equal(a.satNthOfWeek('2026-11-07'), 1);
+  assert.equal(a.satNthOfWeek('2026-11-01'), 5);   // 日 → 前日の10/31（第5土曜）
+  assert.equal(a.satNthOfWeek('2026-03-01'), 4);   // 日 → 前日の2/28（第4土曜）
+  const run = (ds, key) => a.slotForWeek(a.$('WEEK_PLAN').find(p => p.key === key), ds).runShort;
+  for (const [sat, sun] of [['2026-11-14','2026-11-15'], ['2026-11-28','2026-11-29'], ['2026-02-28','2026-03-01']]) {
+    assert.equal(run(sat, 'sat'), 'バイク4×4', sat);
+    assert.match(run(sun, 'sun'), /^なし/, sun);
+  }
+  for (const [sat, sun] of [['2026-11-07','2026-11-08'], ['2026-11-21','2026-11-22'], ['2026-10-31','2026-11-01']]) {
+    assert.equal(run(sat, 'sat'), 'なし', sat);
+    assert.equal(run(sun, 'sun'), 'バイク4×4', sun);
+  }
+  // 上書きしない項目（部位・KBの強さ）はそのまま
+  const s = a.slotForWeek(a.$('WEEK_PLAN').find(p => p.key === 'sat'), '2026-11-14');
+  assert.equal(s.focus, '胸と背中');
+  assert.equal(s.kbLevel, 'light');
+});
+
+test('ストレッチの「ランの日」はラン・ロング走の日だけ（バイク4×4の日と土曜は入れない）', () => {
+  const a = app();
+  assert.equal(a.stretchOrder('2026-11-14').runDay, false);   // 第2土曜（バイク4×4）
+  assert.equal(a.stretchOrder('2026-11-21').runDay, false);   // 第3土曜
+  assert.equal(a.stretchOrder('2026-11-22').runDay, false);   // 日（バイク4×4）
+  assert.equal(a.stretchOrder('2026-11-13').runDay, true);    // 金
+  assert.equal(a.stretchOrder('2026-11-11').runDay, true);    // 水（ロング走）
+});
+
+test('週間の表は今週の土日を出す（第2・4土曜の週はバイクが土曜）', () => {
+  const a = app();
+  const bikeSat = a.weekTableHtml('2026-11-11');   // 土曜は11/14（第2土曜）
+  assert.match(bikeSat, /<td>土<\/td><td>バイク4×4<\/td>/);
+  assert.match(bikeSat, /<td>日<\/td><td>なし（バイクは土曜）<\/td>/);
+  const normal = a.weekTableHtml('2026-11-18');    // 土曜は11/21（第3土曜）
+  assert.match(normal, /<td>土<\/td><td>なし<\/td>/);
+  assert.match(normal, /<td>日<\/td><td>バイク4×4<\/td>/);
 });
 
 test('週間の表はラン・筋トレ・ケトルベルを月〜日で並べ、月・木は休み、今日を強調する（2026-10-30）', () => {
@@ -738,7 +772,9 @@ test('renderWeekScheduleCard() は月〜日を並べ、月・木はジムなし�
   assert.match(h, /🔔 ケトルベル: しっかり（スイング＋スナッチ＋ブルガリアン。RDLはしない/);
   assert.doesNotMatch(h, /<div class="wk-day">火<\/div>.*?🔔 ケトルベル.*?<div class="wk-day">水/s);   // 火曜はケトルベルなし
   assert.match(h, /1\. フロントプル/);
-  assert.match(h, /バイク4×4（筋トレをする日は筋トレ前/);
+  // 2026-10-21 の週の土曜は10/24（第4土曜）なので、バイク4×4は土曜
+  assert.match(h, /<div class="wk-day">土<\/div>.*?バイク4×4（第2・4土曜。筋トレをする日は筋トレ前.*?<div class="wk-day">日<\/div>.*?なし（バイク4×4は土曜に済ませた週）/s);
+  assert.match(a.renderWeekScheduleCard('1', '2026-10-14'), /<div class="wk-day">日<\/div>.*?バイク4×4（筋トレをする日は筋トレ前/s);   // 10/17は第3土曜
   const hongo = a.renderWeekScheduleCard('2', '2026-10-21');
   assert.match(hongo, /1\. チンニング（縦グリップ）/);
   assert.doesNotMatch(hongo, /フロントプル/);
