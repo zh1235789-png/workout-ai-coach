@@ -338,7 +338,14 @@ const DEFAULT_EQUIP_2 = `【マシン種目(PRECOR製)】チェストプレス�
 let state = { tab: 'home', pendingResult: null, error: null, selectedGym: null, cardio: null, bikeDraft: null, b3015Draft: null, cardioLogDate: null, viewingSession: null, calMonth: null, entryRows: null, entryRowsFromMenu: false, shareImage: null, editDraft: null, pickerTarget: null, pain: null, trendEx: null, cardioMin: null, cardioKm: null, kbNote: null, kbMenus: [], filterDate: null, pasteText: null };
 
 function getSessions(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_SESSIONS)||'[]'); }catch(e){ return []; } }
-function saveSessions(list){ localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list)); }
+// 記録の保存はここ1か所を通す。端末間同期（Gist）のために、追加・変更した記録の時刻と
+// 消した記録の時刻（墓標）をここで付ける。呼び出し元は今までどおり配列を渡すだけ。
+function saveSessions(list){
+  const prev = getSessions();
+  localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list));
+  noteSessionsChanged(prev, list);
+}
+function writeSessionsRaw(list){ localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(list)); }
 function getCondition(){ return localStorage.getItem(LS_KEY_CONDITION) || DEFAULT_CONDITION; }
 function getGymEquip(id){ return localStorage.getItem(id==='1'?LS_KEY_GYM_EQUIP_1:LS_KEY_GYM_EQUIP_2) || (id==='1'?DEFAULT_EQUIP_1:DEFAULT_EQUIP_2); }
 function getLastGym(){ return localStorage.getItem(LS_KEY_LAST_GYM) || '1'; }
@@ -2517,6 +2524,7 @@ function renderSettings(){
   ${renderVolumeTargetCard()}
   ${renderCustomExCard()}
   ${renderHamrehabImportCard()}
+  ${renderSyncCard()}
   ${renderBackupCard()}`;
 }
 
@@ -2573,10 +2581,12 @@ function restoreBackup(text, mode){
   const parsed = parseBackup(text);
   const d = parsed.data;
   if(mode === 'replace'){
+    const prevSessions = getSessions();
     BACKUP_KEYS.forEach(k=>{
       if(d[k] != null) localStorage.setItem(k, d[k]);
       else localStorage.removeItem(k);
     });
+    noteSessionsChanged(prevSessions, getSessions());
     return '置き換えました';
   }
   // マージ: 記録はid重複を除いて追加、設定は未設定の項目のみ取り込む
@@ -2891,6 +2901,7 @@ function bindEvents(){
       showBackupMsg('✓ ' + msg, true);
     }catch(err){ showBackupMsg('復元に失敗しました: ' + err.message, false); }
   };
+  bindSyncCard();
   const btnRestoreMerge = document.getElementById('btnRestoreMerge');
   if(btnRestoreMerge) btnRestoreMerge.onclick = ()=> doRestore('merge');
   const btnRestoreReplace = document.getElementById('btnRestoreReplace');
@@ -3878,12 +3889,182 @@ function shiftMonth(ym, delta){
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
 }
 
+/* ===== 端末間同期（GitHubの非公開Gist） =====
+   記録をMac（日曜の振り返り）やほかの端末からも読めるようにする。サーバーを持たず、
+   自分のGistの1ファイルを保存先にする（OET系アプリと同じ方式・同じトークンを使い回せる）。
+   マージは記録（id）単位で「あとに変えた方」を採る。消した記録は墓標（deleted）で伝える。 */
+const LS_KEY_SYNC = 'wac_sync';            // { token, gistId, last, state, err }
+const LS_KEY_SYNC_META = 'wac_sync_meta';  // { ts:{id:ms}, deleted:{id:ms} }
+const GIST_FILE = 'workout-ai-coach.json', GIST_DESC = 'workout-ai-coach sync (auto)';
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k, v){ try{ localStorage.setItem(k, v); return true; }catch(e){ return false; } }
+function getSyncMeta(){
+  try{
+    const m = JSON.parse(lsGet(LS_KEY_SYNC_META) || '{}') || {};
+    return { ts: (m.ts && typeof m.ts === 'object') ? m.ts : {}, deleted: (m.deleted && typeof m.deleted === 'object') ? m.deleted : {} };
+  }catch(e){ return { ts:{}, deleted:{} }; }
+}
+function saveSyncMeta(m){ lsSet(LS_KEY_SYNC_META, JSON.stringify(m)); }
+let SY = (()=>{ try{ return JSON.parse(lsGet(LS_KEY_SYNC) || '{}') || {}; }catch(e){ return {}; } })();
+function saveSY(){ lsSet(LS_KEY_SYNC, JSON.stringify(SY)); }
+let syncing = false, syncAgain = false, syncTimer = null;
+
+// 前と後の記録を比べ、増えた・変わった記録に今の時刻、消えた記録に墓標を付ける
+function noteSessionsChanged(prev, next){
+  try{
+    const now = Date.now(), m = getSyncMeta();
+    const before = new Map((prev||[]).filter(x=>x && x.id).map(x=>[x.id, JSON.stringify(x)]));
+    const after = new Set();
+    (next||[]).forEach(x=>{
+      if(!x || !x.id) return;
+      after.add(x.id);
+      if(before.get(x.id) !== JSON.stringify(x)){ m.ts[x.id] = now; delete m.deleted[x.id]; }
+    });
+    before.forEach((_v, id)=>{ if(!after.has(id)){ m.deleted[id] = now; delete m.ts[id]; } });
+    saveSyncMeta(m);
+  }catch(e){}
+  syncSoon();
+}
+
+function syncDoc(){
+  const m = getSyncMeta();
+  return { app:'workout-ai-coach', v:1, sessions:getSessions(), ts:m.ts, deleted:m.deleted };
+}
+
+// 記録単位で新しい方を採る。相手が空・壊れているときは何もしない（自分の記録を消さない）
+function mergeRemote(R){
+  if(!R || R.app !== 'workout-ai-coach' || !Array.isArray(R.sessions)) return false;
+  const m = getSyncMeta();
+  const rts = (R.ts && typeof R.ts === 'object') ? R.ts : {};
+  const rdel = (R.deleted && typeof R.deleted === 'object') ? R.deleted : {};
+  const mine = new Map(getSessions().filter(x=>x && x.id).map(x=>[x.id, x]));
+  const theirs = new Map(R.sessions.filter(x=>x && x.id).map(x=>[x.id, x]));
+  const ids = new Set([...mine.keys(), ...theirs.keys(), ...Object.keys(m.deleted), ...Object.keys(rdel)]);
+  const out = [], ts = {}, deleted = {};
+  ids.forEach(id=>{
+    const mt = m.ts[id] || 0, tt = rts[id] || 0;
+    const del = Math.max(m.deleted[id] || 0, rdel[id] || 0);
+    let win = null, t = 0;
+    if(mine.has(id) && theirs.has(id)){ if(tt > mt){ win = theirs.get(id); t = tt; } else { win = mine.get(id); t = mt; } }
+    else if(mine.has(id)){ win = mine.get(id); t = mt; }
+    else if(theirs.has(id)){ win = theirs.get(id); t = tt; }
+    if(del && del >= t){ deleted[id] = del; return; }   // 消した後に変えていなければ消す
+    if(win){ out.push(win); if(t) ts[id] = t; }
+  });
+  out.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  writeSessionsRaw(out);
+  saveSyncMeta({ ts, deleted });
+  return true;
+}
+
+async function gh(path, opts){
+  const res = await fetch('https://api.github.com' + path, Object.assign({ cache:'no-store' }, opts||{}, {
+    headers: { 'Authorization':'Bearer ' + SY.token, 'Accept':'application/vnd.github+json', 'Content-Type':'application/json' },
+  }));
+  if(!res.ok) throw new Error(
+    res.status === 401 ? 'トークンが無効か期限切れです'
+    : (res.status === 403 || res.status === 404) ? 'トークンにgist権限がありません（' + res.status + '）'
+    : 'GitHubエラー ' + res.status);
+  return res.status === 204 ? null : res.json();
+}
+
+async function syncNow(){
+  if(!SY.token) return;
+  if(syncing){ syncAgain = true; return; }
+  syncing = true; SY.state = 'syncing'; paintSyncStatus();
+  let changed = false;
+  try{
+    if(!SY.gistId){
+      const list = await gh('/gists?per_page=100');
+      const g = list.find(x=>x.files && x.files[GIST_FILE]);
+      SY.gistId = g ? g.id : (await gh('/gists', { method:'POST', body: JSON.stringify({
+        description: GIST_DESC, public:false, files: { [GIST_FILE]: { content: JSON.stringify(syncDoc()) } } }) })).id;
+    }
+    const g = await gh('/gists/' + SY.gistId);
+    const f = g.files && g.files[GIST_FILE];
+    let remoteText = f ? f.content : '';
+    if(f && f.truncated) remoteText = await (await fetch(f.raw_url, { cache:'no-store' })).text();
+    let remote = null; try{ remote = JSON.parse(remoteText); }catch(e){}
+    const before = lsGet(LS_KEY_SESSIONS);
+    mergeRemote(remote);
+    changed = lsGet(LS_KEY_SESSIONS) !== before;
+    const mineText = JSON.stringify(syncDoc());
+    if(mineText !== remoteText) await gh('/gists/' + SY.gistId, { method:'PATCH',
+      body: JSON.stringify({ files: { [GIST_FILE]: { content: mineText } } }) });
+    SY.last = Date.now(); SY.state = 'ok'; SY.err = '';
+  }catch(e){
+    SY.state = 'err';
+    SY.err = (typeof navigator !== 'undefined' && navigator.onLine === false)
+      ? 'オフライン（次にネットにつながったとき同期します）' : e.message;
+  }
+  saveSY(); syncing = false;
+  // 入力中の画面を壊さないよう、記録が変わったときと設定タブを開いているときだけ描き直す
+  if(changed || state.tab === 'settings') render();
+  else paintSyncStatus();
+  if(syncAgain){ syncAgain = false; syncNow(); }
+}
+function syncSoon(){ if(!SY.token) return; clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 2000); }
+function syncText(){
+  if(!SY.token) return '';
+  if(SY.state === 'syncing') return '☁️ 同期中…';
+  if(SY.state === 'err') return '⚠️ 同期エラー：' + SY.err;
+  if(SY.last){
+    const d = new Date(SY.last);
+    return `☁️ 同期済み ${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+  return '☁️ 同期待ち';
+}
+function paintSyncStatus(){
+  const el = document.getElementById('syncStatus');
+  if(el && el.nodeType){ el.textContent = syncText(); el.style.color = SY.state === 'err' ? 'var(--danger)' : ''; }
+}
+function renderSyncCard(){
+  if(SY.token){
+    return `<div class="card">
+    <h2>☁️ 同期（GitHubの非公開Gist）</h2>
+    <div class="sub" id="syncStatus" style="margin-bottom:10px;${SY.state==='err'?'color:var(--danger)':''}">${escapeHtml(syncText())}</div>
+    <button class="btn btn-secondary" id="btnSyncNow">今すぐ同期</button>
+    <button class="btn btn-ghost" id="btnSyncOff">この端末の同期を解除</button>
+    <div class="sub" style="margin-top:10px">アプリを開いたとき・記録を保存した2秒後・画面に戻ったときに自動で同期します。Macの週の振り返りもここから記録を読みます。</div>
+  </div>`;
+  }
+  return `<div class="card">
+    <h2>☁️ 同期（GitHubの非公開Gist）</h2>
+    <div class="sub" style="margin-bottom:10px">記録を自分の非公開Gistに保存し、ほかの端末やMacの週の振り返りから読めるようにします。</div>
+    <ol class="sub" style="padding-left:20px;line-height:1.7;margin-bottom:10px">
+      <li>OETのアプリで使っているトークン（ghp_…）があれば、それをそのまま貼れます</li>
+      <li>無ければ <a href="https://github.com/settings/tokens/new?scopes=gist&description=workout-ai-coach%20sync" target="_blank" rel="noopener" style="color:var(--accent)">GitHubのトークン作成画面</a> で gist だけにチェックが入った状態のまま「Generate token」</li>
+      <li>下に貼り付けて「接続」</li>
+    </ol>
+    <div class="field"><input id="inputSyncToken" type="password" autocomplete="off" placeholder="ghp_…"></div>
+    <button class="btn btn-primary" id="btnSyncOn">接続</button>
+    <div class="sub" style="margin-top:10px">トークンはこの端末の中にだけ保存され、GitHub以外には送られません。</div>
+  </div>`;
+}
+function bindSyncCard(){
+  const on = document.getElementById('btnSyncOn');
+  if(on) on.onclick = ()=>{
+    const t = (document.getElementById('inputSyncToken').value || '').trim();
+    if(!t) return;
+    SY = { token: t }; saveSY(); render(); syncNow();
+  };
+  const go = document.getElementById('btnSyncNow');
+  if(go) go.onclick = ()=> syncNow();
+  const off = document.getElementById('btnSyncOff');
+  if(off) off.onclick = ()=>{
+    if(confirm('この端末の同期を解除します（記録はこの端末に残ります）')){ SY = {}; saveSY(); render(); }
+  };
+}
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible') syncNow(); });
+window.addEventListener('online', ()=> syncNow());
+
 autoImportHamrehabBike();
 migrateLegTarget();
 loadDraft();
 // デイリーホームの「🧘 ストレッチ」リンク（#stretch）からはストレッチのタブで開く
 try{ if(location.hash === '#stretch') state.tab = 'stretch'; }catch(e){}
 render({ skipCapture: true });
+syncNow();
 </script>
 </body>
 </html>
