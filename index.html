@@ -3684,7 +3684,7 @@ function weekPlanText(dateStr){
   const next = nextGymSlot(dateStr);
   const rows = WEEK_PLAN.map(p=>`- ${p.label}: ${p.focus} / ラン=${p.run}${p.alt ? `（第${p.alt.satNth.join('・')}土曜の週は ${p.alt.run}）` : ''} / ジムの脚=${p.leg ? p.leg+'を1種目' : 'なし'}${p.kb ? ' / 自宅ケトルベル='+p.kb : ''}${p.note ? '　※'+p.note : ''}`).join('\n');
   const leg = legForSlot(next, dateStr);
-  const legTxt = leg ? `「${leg}」を1種目だけoptional_exercisesの最初に入れてください（2〜3セット）`
+  const legTxt = leg ? `「${leg}」を1種目だけoptional_exercisesの最初に入れてください（2〜3セット。ただし今日のハムの痛みが1以上なら【脚トレ】のとおりレッグエクステンションに置き換える）`
     : '入れないでください（この曜日はジムの脚なし。optional_exercisesは上半身の1〜2種目だけ）';
   const swap = swapNoteText(next);
   const tomorrow = avoidRuleApplies(dateStr);
@@ -3763,7 +3763,9 @@ function renderWeekScheduleCard(gymId, dateStr){
   let rows = '';
   [1,2,3,4,5,6,0].forEach(wd=>{
     const label = '日月火水木金土'[wd];
-    const slot = slotForWeek(WEEK_PLAN.find(p=>p.days.includes(wd)), today);
+    const planned = slotForWeek(WEEK_PLAN.find(p=>p.days.includes(wd)), today);
+    // 次回が差し替わっているときは、その曜日の行も差し替え先のメニューで出す（上の「次回は〜」と食い違わないように）
+    const slot = planned && next.swappedFrom && planned.key === next.dayKey ? Object.assign({}, planned, { key: next.key, focus: next.focus }) : planned;
     const cls = 'wk-row' + (wd === wdToday ? ' today' : '');
     if(!slot){
       const o = offDayPlanFor(wd) || OFF_DAY_PLAN;
@@ -3773,7 +3775,7 @@ function renderWeekScheduleCard(gymId, dateStr){
     const menu = menus[slot.key];
     const ex = menu ? menu.must.map((n,i)=>`${i+1}. ${escapeHtml(n)}`).join('<br>') : escapeHtml(slot.note || '');
     rows += `<div class="${cls}"><div class="wk-day">${label}</div><div class="wk-body">
-      <div class="wk-focus">${escapeHtml(slot.focus)}・${escapeHtml(legLabel(slot.leg))}${slot.key === (next.dayKey || next.key) ? `<span class="wk-tag">次回${next.swappedFrom ? '（差し替え）' : ''}</span>` : ''}</div>
+      <div class="wk-focus">${escapeHtml(slot.focus)}・${escapeHtml(legLabel(slot.leg))}${planned.key === (next.dayKey || next.key) ? `<span class="wk-tag">次回${next.swappedFrom ? '（差し替え）' : ''}</span>` : ''}</div>
       <div class="wk-meta">${escapeHtml(slot.run)}</div>
       ${slot.kb ? `<div class="wk-meta">🔔 ケトルベル: ${escapeHtml(slot.kb)}</div>` : ''}
       ${slot.abs && menus.abs ? `<div class="wk-meta">💪 腹筋（バイク4×4のあと）: ${escapeHtml(menus.abs.must.concat(menus.abs.optional).join('・'))}</div>` : ''}

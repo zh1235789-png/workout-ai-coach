@@ -54,7 +54,10 @@ test('差し替えは週間スケジュールと今日のメニュー（AIの提
   const card = a.renderWeekScheduleCard('1', '2026-11-16');
   assert.match(card, /次回は火曜：背中＋二頭・脚：レッグエクステンション/);
   assert.match(card, /🔁 前日に胸をやったので、火曜の予定（胸＋三頭）を水曜のメニュー（背中＋二頭）に差し替え/);
-  assert.match(card, /<div class="wk-day">火<\/div>.*?胸＋三頭・脚：レッグエクステンション<span class="wk-tag">次回（差し替え）<\/span>/s);
+  assert.match(card, /<div class="wk-day">火<\/div>.*?背中＋二頭・脚：レッグエクステンション<span class="wk-tag">次回（差し替え）<\/span>.*?1\. フロントプル.*?<div class="wk-day">水<\/div>/s);
+  assert.doesNotMatch(card.slice(card.indexOf('<div class="wk-day">火</div>'), card.indexOf('<div class="wk-day">水</div>')), /マシンチェストプレス/);
+  // 水曜の行は予定どおり（背中＋二頭）
+  assert.match(card, /<div class="wk-day">水<\/div>.*?背中＋二頭・脚なし/s);
   const today = a.renderTodayMenuCard(null, '1', '2026-11-17');
   assert.match(today, /火・背中＋二頭/);
   assert.match(today, /1?フロントプル/);
