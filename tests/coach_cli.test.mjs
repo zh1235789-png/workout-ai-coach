@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadApp, norm } from './harness.mjs';
-import { parseArgs, storageFromDoc, promptFromDoc, applyToDoc } from '../tools/coach_cli.mjs';
+import { parseArgs, storageFromDoc, promptFromDoc, applyToDoc, painValue } from '../tools/coach_cli.mjs';
 
 const TODAY = '2026-11-25T20:00:00+09:00';
 const NOW = new Date(TODAY).getTime();
@@ -57,4 +57,12 @@ test('Macで足した記録は、アプリが同期で取り込み、今日の�
   assert.deepEqual(norm(app.getSessions()).map(s => s.id), ['1', String(NOW)]);
   const last = norm(app.getSessions()).find(s => s.id === String(NOW));
   assert.match(app.renderTodayMenuCard(last, '1', '2026-11-26'), /3×10 40kg/);
+});
+
+test('痛みは0〜10の整数だけ受け付ける', () => {
+  assert.equal(painValue('3'), 3);
+  assert.equal(painValue(''), null);
+  assert.equal(painValue(undefined), null);
+  for (const bad of ['-1', '11', '2.5', 'abc']) assert.throws(() => painValue(bad), /0〜10の整数/, bad);
+  assert.throws(() => applyToDoc(doc(), answer, { pain: '999', today: TODAY }), /0〜10の整数/);
 });

@@ -47,6 +47,14 @@ function writeDoc(id, doc) {
   gh(['api', '-X', 'PATCH', `/gists/${id}`, '--input', '-'], JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(doc) } } }));
 }
 
+// 左ハムの痛み（0〜10の整数）。空なら null、範囲外・数字でなければ止める（純粋関数）
+export function painValue(pain) {
+  if (pain == null || pain === '') return null;
+  const n = Number(pain);
+  if (!Number.isInteger(n) || n < 0 || n > 10) throw new Error(`痛みは0〜10の整数で指定してください（${pain}）`);
+  return n;
+}
+
 // Gist の中身をアプリの localStorage の形にする（純粋関数）
 export function storageFromDoc(doc) {
   const storage = { wac_sessions: JSON.stringify(doc.sessions || []) };
@@ -59,8 +67,7 @@ export function storageFromDoc(doc) {
 export function promptFromDoc(doc, { gym, pain, today } = {}) {
   const app = loadApp({ today, storage: storageFromDoc(doc) });
   const gymId = gym === '2' || gym === '1' ? gym : app.getLastGym();
-  const p = pain == null || pain === '' ? null : Number(pain);
-  return { gymId, prompt: app.buildPrompt(gymId, null, null, Number.isFinite(p) ? p : null) };
+  return { gymId, prompt: app.buildPrompt(gymId, null, null, painValue(pain)) };
 }
 
 // 3) 回答を検査して、Gist の中身に1件足した新しい中身を返す（純粋関数。書き込みはしない）
@@ -69,8 +76,7 @@ export function applyToDoc(doc, answerText, { pain, now, force, today } = {}) {
   const result = norm(app.validateResult(app.parseClaudeJson(answerText)));
   const t = now || Date.now();
   result.id = String(t);
-  const p = pain == null || pain === '' ? null : Number(pain);
-  result.pain = Number.isFinite(p) ? p : null;
+  result.pain = painValue(pain);
   const same = (doc.sessions || []).filter(s => s && s.type !== 'cardio' && s.date === result.date);
   if (same.length && !force) {
     throw new Error(`${result.date} の筋トレの記録がすでにあります（${same.length}件）。同じ写真を二重に送っていないか確かめ、別の記録なら --force を付けてください`);
