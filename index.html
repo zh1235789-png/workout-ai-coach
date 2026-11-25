@@ -2689,7 +2689,7 @@ function bindEvents(){
   document.querySelectorAll('.gym-btn').forEach(b=>{
     b.onclick = ()=>{
       state.selectedGym = b.dataset.gym;
-      localStorage.setItem(LS_KEY_LAST_GYM, b.dataset.gym);
+      setSetting(LS_KEY_LAST_GYM, b.dataset.gym);
       render();
     };
   });
@@ -3114,7 +3114,7 @@ function bindEvents(){
 
   const btnSaveSettings = document.getElementById('btnSaveSettings');
   if(btnSaveSettings) btnSaveSettings.onclick = ()=>{
-    localStorage.setItem(LS_KEY_CONDITION, document.getElementById('inputCondition').value.trim());
+    setSetting(LS_KEY_CONDITION, document.getElementById('inputCondition').value.trim());
     const msg = document.getElementById('settingsSaved');
     msg.style.display='block';
     setTimeout(()=>{ msg.style.display='none'; }, 1800);
@@ -3122,8 +3122,8 @@ function bindEvents(){
 
   const btnSaveEquip = document.getElementById('btnSaveEquip');
   if(btnSaveEquip) btnSaveEquip.onclick = ()=>{
-    localStorage.setItem(LS_KEY_GYM_EQUIP_1, document.getElementById('inputEquip1').value.trim());
-    localStorage.setItem(LS_KEY_GYM_EQUIP_2, document.getElementById('inputEquip2').value.trim());
+    setSetting(LS_KEY_GYM_EQUIP_1, document.getElementById('inputEquip1').value.trim());
+    setSetting(LS_KEY_GYM_EQUIP_2, document.getElementById('inputEquip2').value.trim());
     const msg = document.getElementById('equipSaved');
     msg.style.display='block';
     setTimeout(()=>{ msg.style.display='none'; }, 1800);
@@ -3132,8 +3132,8 @@ function bindEvents(){
   const btnResetEquip = document.getElementById('btnResetEquip');
   if(btnResetEquip) btnResetEquip.onclick = ()=>{
     if(!confirm('両店舗の設備リストを初期状態に戻します。よろしいですか？')) return;
-    localStorage.removeItem(LS_KEY_GYM_EQUIP_1);
-    localStorage.removeItem(LS_KEY_GYM_EQUIP_2);
+    setSetting(LS_KEY_GYM_EQUIP_1, null);
+    setSetting(LS_KEY_GYM_EQUIP_2, null);
     render();
   };
 
@@ -3412,11 +3412,8 @@ function validateResult(obj){
   return obj;
 }
 
-// 曜日別メニュー（2026-10-21 ユーザー指定。同日に腕の組み合わせを胸＋三頭・背中＋二頭へ修正。2026-10-30 火曜にサイドレイズを必須で追加＝肩中部を週2回に。2026-11-12 火曜にリアデルト種目を必須で追加＝肩後部を週2回に。押す日に引く種目で釣り合いを取る）。火=胸＋三頭、水=背中＋二頭、金=肩、土=胸と背中（火・水と同じ種目）、日=振替枠（行けなかった曜日の分）。
-// 金と土は同日中に入れ替え（背中の間隔が水→土の中2日になる）。
 // must は順番どおりに固定（Kassiano 2022 JSCR: 計画的な変化は良いが頻繁なランダム交代は不利）。
-// 手首痛のためバーベルベンチ・バーベルロウ・デッドリフト・ストレートバーは使わない。志村はケーブルマシン不可。
-// チンニングは週1回以上（ユーザー指定）: 本郷は背中の縦引きが常にチンニング、志村は土曜の縦引きをチンニングにする。
+// 手首痛のためバーベルベンチ・バーベルロウ・デッドリフト・ストレートバーは使わない。志村はケーブルマシン不可。チンニングは週1回以上（火曜の最初）。
 // 曜日別の固定メニュー（2026-11-25 見直し）。sets は must と同じ順のセット数（本番セット）。
 // 胸と背中を週2回（火=背中、水=胸、土=胸と背中）。肩・腕は任意の4日目（金か日）。
 // セット数の考え方: 必須の3日だけで主な部位が週12セット以上（Baz-Valle 2022）、20超は伸びが小さい（Pelland 2025）ので胸・背中は16前後で止め、
@@ -4018,17 +4015,26 @@ function shiftMonth(ym, delta){
    自分のGistの1ファイルを保存先にする（OET系アプリと同じ方式・同じトークンを使い回せる）。
    マージは記録（id）単位で「あとに変えた方」を採る。消した記録は墓標（deleted）で伝える。 */
 const LS_KEY_SYNC = 'wac_sync';            // { token, gistId, last, state, err }
-const LS_KEY_SYNC_META = 'wac_sync_meta';  // { ts:{id:ms}, deleted:{id:ms} }
+const LS_KEY_SYNC_META = 'wac_sync_meta';  // { ts:{id:ms}, deleted:{id:ms}, sts:{設定キー:ms} }
+// 記録のほかに同期する設定（2026-11-25〜。Macで写真から次回メニューを作るとき、アプリと同じプロンプトを組むため）。
+// 値は文字列か null（null＝初期値に戻した）。いつ変えたか（sts）で新しい方を採る
+const SYNC_SETTING_KEYS = ['wac_condition', 'wac_last_gym', 'wac_gym_equip_1', 'wac_gym_equip_2'];
 const GIST_FILE = 'workout-ai-coach.json', GIST_DESC = 'workout-ai-coach sync (auto)';
 function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
 function lsSet(k, v){ try{ localStorage.setItem(k, v); return true; }catch(e){ return false; } }
 function getSyncMeta(){
   try{
     const m = JSON.parse(lsGet(LS_KEY_SYNC_META) || '{}') || {};
-    return { ts: (m.ts && typeof m.ts === 'object') ? m.ts : {}, deleted: (m.deleted && typeof m.deleted === 'object') ? m.deleted : {} };
-  }catch(e){ return { ts:{}, deleted:{} }; }
+    const obj = x=>(x && typeof x === 'object') ? x : {};
+    return { ts: obj(m.ts), deleted: obj(m.deleted), sts: obj(m.sts) };
+  }catch(e){ return { ts:{}, deleted:{}, sts:{} }; }
 }
 function saveSyncMeta(m){ lsSet(LS_KEY_SYNC_META, JSON.stringify(m)); }
+// 同期する設定を書く（null で消す＝初期値に戻す）。変えた時刻を付けて同期を予約する
+function setSetting(key, value){
+  try{ if(value == null) localStorage.removeItem(key); else localStorage.setItem(key, value); }catch(e){}
+  if(SYNC_SETTING_KEYS.includes(key)){ const m = getSyncMeta(); m.sts[key] = Date.now(); saveSyncMeta(m); syncSoon(); }
+}
 let SY = (()=>{ try{ return JSON.parse(lsGet(LS_KEY_SYNC) || '{}') || {}; }catch(e){ return {}; } })();
 function saveSY(){ lsSet(LS_KEY_SYNC, JSON.stringify(SY)); }
 let syncing = false, syncAgain = false, syncTimer = null;
@@ -4052,7 +4058,9 @@ function noteSessionsChanged(prev, next){
 
 function syncDoc(){
   const m = getSyncMeta();
-  return { app:'workout-ai-coach', v:1, sessions:getSessions(), ts:m.ts, deleted:m.deleted };
+  const settings = {};
+  SYNC_SETTING_KEYS.forEach(k=>{ settings[k] = lsGet(k); });
+  return { app:'workout-ai-coach', v:1, sessions:getSessions(), ts:m.ts, deleted:m.deleted, settings, sts:m.sts };
 }
 
 // 記録単位で新しい方を採る。相手が空・壊れているときは何もしない（自分の記録を消さない）
@@ -4077,7 +4085,17 @@ function mergeRemote(R){
   });
   out.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   writeSessionsRaw(out);
-  saveSyncMeta({ ts, deleted });
+  // 設定は、相手の方があとで変えていれば相手の値にする（相手が知らない設定は自分のまま）
+  const sts = Object.assign({}, m.sts);
+  const rsts = (R.sts && typeof R.sts === 'object') ? R.sts : {};
+  const rset = (R.settings && typeof R.settings === 'object') ? R.settings : {};
+  SYNC_SETTING_KEYS.forEach(k=>{
+    if((rsts[k] || 0) > (sts[k] || 0) && k in rset){
+      try{ if(rset[k] == null) localStorage.removeItem(k); else localStorage.setItem(k, String(rset[k])); }catch(e){}
+      sts[k] = rsts[k];
+    }
+  });
+  saveSyncMeta({ ts, deleted, sts });
   return true;
 }
 
@@ -4109,9 +4127,10 @@ async function syncNow(){
     let remoteText = f ? f.content : '';
     if(f && f.truncated) remoteText = await (await fetch(f.raw_url, { cache:'no-store' })).text();
     let remote = null; try{ remote = JSON.parse(remoteText); }catch(e){}
-    const before = lsGet(LS_KEY_SESSIONS);
+    const snap = ()=>[LS_KEY_SESSIONS].concat(SYNC_SETTING_KEYS).map(k=>lsGet(k)).join('\u0000');
+    const before = snap();
     mergeRemote(remote);
-    changed = lsGet(LS_KEY_SESSIONS) !== before;
+    changed = snap() !== before;   // 記録か設定（コンディション文・ジム）が相手の内容に変わった
     const mineText = JSON.stringify(syncDoc());
     if(mineText !== remoteText) await gh('/gists/' + SY.gistId, { method:'PATCH',
       body: JSON.stringify({ files: { [GIST_FILE]: { content: mineText } } }) });

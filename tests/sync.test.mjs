@@ -108,5 +108,35 @@ test('Gistに書く中身には記録・時刻・墓標が入る', () => {
 
 test('同期の設定が壊れていても起動できる', () => {
   const a = loadApp({ today: NOW, storage: { wac_sync: 'not json{', wac_sync_meta: '[[' }, expectClean: true });
-  assert.deepEqual(meta(a), { ts: {}, deleted: {} });
+  assert.deepEqual(meta(a), { ts: {}, deleted: {}, sts: {} });
+});
+
+// ===== 設定の同期（2026-11-25〜。Macで写真から次回メニューを作るため） =====
+
+test('コンディション文・ジム・設備は変えた時刻つきで同期の中身に入る', () => {
+  const a = app([]);
+  a.setSetting('wac_condition', '肩が少し痛い');
+  a.setSetting('wac_last_gym', '2');
+  const d = norm(a.syncDoc());
+  assert.equal(d.settings.wac_condition, '肩が少し痛い');
+  assert.equal(d.settings.wac_last_gym, '2');
+  assert.equal(d.settings.wac_gym_equip_1, null);
+  assert.equal(d.sts.wac_condition, T);
+  assert.equal(a.getCondition(), '肩が少し痛い');
+});
+
+test('設定は相手があとで変えていれば相手の値になり、自分の方が新しければ残す。null は初期値に戻す', () => {
+  const a = loadApp({ today: NOW, storage: { wac_sessions: '[]', wac_condition: '自分の文', wac_last_gym: '1', wac_gym_equip_1: '古い設備',
+    wac_sync_meta: JSON.stringify({ ts: {}, deleted: {}, sts: { wac_condition: 200, wac_last_gym: 500, wac_gym_equip_1: 100 } }) } });
+  a.mergeRemote({ app: 'workout-ai-coach', sessions: [], settings: { wac_condition: '相手の文', wac_last_gym: '2', wac_gym_equip_1: null }, sts: { wac_condition: 300, wac_last_gym: 400, wac_gym_equip_1: 150 } });
+  assert.equal(a.getCondition(), '相手の文');
+  assert.equal(a.getLastGym(), '1');                 // 自分の方が新しい
+  assert.equal(a.getGymEquip('1'), a.$('DEFAULT_EQUIP_1'));   // 相手が初期値に戻した
+  assert.deepEqual(meta(a).sts, { wac_condition: 300, wac_last_gym: 500, wac_gym_equip_1: 150 });
+});
+
+test('設定を持たない古い同期データでも、自分の設定は消えない', () => {
+  const a = loadApp({ today: NOW, storage: { wac_sessions: '[]', wac_condition: '自分の文' } });
+  a.mergeRemote({ app: 'workout-ai-coach', sessions: [], ts: {}, deleted: {} });
+  assert.equal(a.getCondition(), '自分の文');
 });
