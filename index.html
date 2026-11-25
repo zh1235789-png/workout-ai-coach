@@ -3712,7 +3712,7 @@ function anchorMenuText(gymId){
   const next = nextGymSlot(today);
   const body = WEEK_PLAN.filter(p=>menus[p.key]).map(p=>{
     const m = menus[p.key];
-    return `■${p.label}（${p.focus}）\n  必須（この順で固定。セット数は本番セット）: ${mustWithSets(m).map((n,i)=>`${i+1}. ${n}`).join(' / ')}\n  余裕枠の上半身候補: ${m.optional.join(' / ')}`;
+    return `■${p.label}（${p.focus}）\n  必須（この順で固定）: ${m.must.map((n,i)=>`${i+1}. ${n}`).join(' / ')}${m.sets ? `\n  必須のセット数（本番セット。種目名には付けない）: ${m.sets.map((s,i)=>`${i+1}=${s}`).join(' / ')}` : ''}\n  余裕枠の上半身候補: ${m.optional.join(' / ')}`;
   }).join('\n');
   const chinDone = chinDoneThisWeek(today);
   let nextRule;
